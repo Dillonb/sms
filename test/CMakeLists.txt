@@ -2,7 +2,7 @@ add_executable(cpm_test cpm_test.cpp)
 target_link_libraries(cpm_test z80 util)
 
 foreach (test zexall zexdoc prelim)
-    configure_file(data/${test}.com ${test}.com} COPYONLY)
+    configure_file(data/${test}.com ${test}.com COPYONLY)
     if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data/${test}.log")
         configure_file(${CMAKE_CURRENT_SOURCE_DIR}/data/${test}.log ${test}.log COPYONLY)
         add_test(NAME cpm_${test} COMMAND cpm_test ${test}.com ${test}.log)

@@ -11,10 +11,14 @@
 namespace Z80 {
     typedef u8 (*read_byte_handler)(u16 address);
     typedef void (*write_byte_handler)(u16 address, u8 value);
+    typedef u8 (*port_in_handler)(u8 port);
+    typedef void (*port_out_handler)(u8 port, u8 value);
 
     typedef struct z80 {
         read_byte_handler read_byte;
         write_byte_handler write_byte;
+        port_in_handler port_in;
+        port_out_handler port_out;
 
         u8 a;
         FlagRegister f;
@@ -36,6 +40,7 @@ namespace Z80 {
 
     void reset();
     void set_bus_handlers(read_byte_handler read_handler, write_byte_handler write_handler);
+    void set_port_handlers(port_in_handler in_handler, port_out_handler out_handler);
 
     void set_pc(u16 address);
 

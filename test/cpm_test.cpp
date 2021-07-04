@@ -10,6 +10,7 @@ using std::cout;
 using std::endl;
 
 u8 memory[0x10000];
+bool should_quit = false;
 
 u8 read_byte(u16 address) {
     return memory[address];
@@ -64,6 +65,28 @@ void check_log(std::string& line) {
     }
 }
 
+u8 port_in(u8 port) {
+    u8 syscall = Z80::z80.bc[Z80::WideRegister::Lo];
+
+    switch (syscall) {
+        case 9: { // Print all characters until '$' is found
+            u16 addr = Z80::z80.de.raw;
+            for (char c = (char)memory[addr++]; c != '$'; c = (char)memory[addr++]) {
+                printf("%c", c);
+            }
+            break;
+        }
+        default:
+            logfatal("Unknown syscall %d!", syscall);
+    }
+
+    return 0xFF;
+}
+
+void port_out(u8 port, u8 value) {
+    should_quit = true; // Success!
+}
+
 int main(int argc, char** argv) {
     if (argc != 2 && argc != 3) {
         cout << "Usage: " << argv[0] << " <test> <log>" << endl;
@@ -85,6 +108,8 @@ int main(int argc, char** argv) {
 
     memset(memory, 0x00, 65535);
 
+    memory[0x00] = 0xD3;
+    memory[0x01] = 0x00;
     memory[0x05] = 0xDB;
     memory[0x06] = 0x00;
     memory[0x07] = 0xC9;
@@ -92,30 +117,16 @@ int main(int argc, char** argv) {
     std::cout << "Loaded CPM test: " << argv[1] << std::endl;
     Z80::reset();
     Z80::set_bus_handlers(read_byte, write_byte);
+    Z80::set_port_handlers(port_in, port_out);
     Z80::set_pc(0x100);
     load_rom(argv[1]);
     std::string line;
-    while (true) {
+    while (!should_quit) {
         if (log_loaded) {
             getline(f, line);
             check_log(line);
         }
         Z80::step();
-        // Syscall!
-        if (Z80::z80.pc == 5) {
-            u8 syscall = Z80::z80.bc[Z80::WideRegister::Lo];
-
-            switch (syscall) {
-                case 9: { // Print all characters until '$' is found
-                    u16 addr = Z80::z80.de.raw;
-                    for (char c = (char)memory[addr++]; c != '$'; c = (char)memory[addr++]) {
-                        printf("%c", c);
-                    }
-                    break;
-                }
-                default:
-                    logfatal("Unknown syscall %d!", syscall);
-            }
-        }
     }
+    exit(0);
 }

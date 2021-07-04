@@ -30,7 +30,9 @@ namespace {
         HL,
         BC,
         IX,
-        IY
+        IXPlus,
+        IY,
+        IYPlus
     };
 
     u16 read_16(u16 address) {
@@ -227,9 +229,25 @@ namespace {
                 }
             }
             case AddressingMode::HL:
-                return read_16(get_register<Register::HL>());
+                if (std::is_same_v<T, u16>) {
+                    return read_16(get_register<Register::HL>());
+                } else if (std::is_same_v<T, u8>) {
+                    return z80.read_byte(get_register<Register::HL>());
+                }
             case AddressingMode::BC:
                 return read_16(get_register<Register::BC>());
+            case AddressingMode::IXPlus:
+                if (std::is_same_v<T, u16>) {
+                    return read_16(get_register<Register::IX>() + (s8)z80.read_byte(z80.pc++));
+                } else if (std::is_same_v<T, u8>) {
+                    return z80.read_byte(get_register<Register::IX>() + (s8)z80.read_byte(z80.pc++));
+                }
+            case AddressingMode::IYPlus:
+                if (std::is_same_v<T, u16>) {
+                    return read_16(get_register<Register::IY>() + (s8)z80.read_byte(z80.pc++));
+                } else if (std::is_same_v<T, u8>) {
+                    return z80.read_byte(get_register<Register::IY>() + (s8)z80.read_byte(z80.pc++));
+                }
         }
     }
 
@@ -357,7 +375,17 @@ namespace Z80 {
                 return 6;
             }
             case sizeof(u8): {
-                logfatal("inc u8 (set flags and stuff)");
+                u8 m = get_register<reg>();
+                u8 r = m + 1;
+                z80.f.n = false;
+                z80.f.p_v = m == 0x7F;
+                z80.f.h = (m & 0xF) == 0xF;
+                z80.f.b3 = (r >> 3) & 1;
+                z80.f.b5 = (r >> 5) & 1;
+                z80.f.z = r == 0;
+                z80.f.s = ((s8)r) < 0;
+                set_register<reg>(r);
+                return 4;
             }
         }
     }
@@ -539,9 +567,13 @@ namespace Z80 {
         return 4;
     }
 
+    int instr_in() {
+        z80.a = z80.port_in(z80.read_byte(z80.pc++));
+        return 4;
+    }
+
     int instr_out() {
-        // stubbed for now
-        z80.pc++;
+        z80.port_out(z80.read_byte(z80.pc++), z80.a);
         return 4;
     }
 
@@ -610,6 +642,16 @@ namespace Z80 {
         return 4;
     }
 
+    int instr_djnz() {
+        set_register<Register::B>(get_register<Register::B>() - 1);
+        s8 offset = z80.read_byte(z80.pc++);
+        if (get_register<Register::B>() != 0) {
+            z80.pc += offset;
+            return 13;
+        }
+        return 8;
+    }
+
     const instruction instructions[0x100] = {
             /* 00 */ instr_nop,
             /* 01 */ instr_ld<Register::BC, AddressingMode::Immediate>,
@@ -627,7 +669,7 @@ namespace Z80 {
             /* 0D */ instr_dec<Register::C>,
             /* 0E */ instr_ld<Register::C, AddressingMode::Immediate>,
             /* 0F */ instr_rrca,
-            /* 10 */ unimplemented_instr<0x10>,
+            /* 10 */ instr_djnz,
             /* 11 */ instr_ld<Register::DE, AddressingMode::Immediate>,
             /* 12 */ unimplemented_instr<0x12>,
             /* 13 */ instr_inc<Register::DE>,
@@ -671,7 +713,7 @@ namespace Z80 {
             /* 39 */ unimplemented_instr<0x39>,
             /* 3A */ instr_ld<Register::A, AddressingMode::Indirect>,
             /* 3B */ unimplemented_instr<0x3B>,
-            /* 3C */ unimplemented_instr<0x3C>,
+            /* 3C */ instr_inc<Register::A>,
             /* 3D */ unimplemented_instr<0x3D>,
             /* 3E */ instr_ld<Register::A, AddressingMode::Immediate>,
             /* 3F */ unimplemented_instr<0x3F>,
@@ -822,7 +864,7 @@ namespace Z80 {
             /* D0 */ instr_ret<Condition::NC>,
             /* D1 */ instr_pop<Register::DE>,
             /* D2 */ instr_jp<Condition::NC, AddressingMode::Indirect>,
-            /* D3 */ unimplemented_instr<0xD3>,
+            /* D3 */ instr_out,
             /* D4 */ instr_call<Condition::NC>,
             /* D5 */ instr_push<Register::DE>,
             /* D6 */ unimplemented_instr<0xD6>,
@@ -830,7 +872,7 @@ namespace Z80 {
             /* D8 */ instr_ret<Condition::C>,
             /* D9 */ instr_exx,
             /* DA */ instr_jp<Condition::C, AddressingMode::Indirect>,
-            /* DB */ instr_out, //unimplemented_instr<0xDB>,
+            /* DB */ instr_in, //unimplemented_instr<0xDB>,
             /* DC */ instr_call<Condition::C>,
             /* DD */ instr_dd,
             /* DE */ unimplemented_instr<0xDE>,
@@ -903,9 +945,9 @@ namespace Z80 {
             /* DD 1E */ unimplemented_dd_instr<0x1E>,
             /* DD 1F */ unimplemented_dd_instr<0x1F>,
             /* DD 20 */ unimplemented_dd_instr<0x20>,
-            /* DD 21 */ unimplemented_dd_instr<0x21>,
+            /* DD 21 */ instr_ld<Register::IX, AddressingMode::Immediate>,
             /* DD 22 */ unimplemented_dd_instr<0x22>,
-            /* DD 23 */ unimplemented_dd_instr<0x23>,
+            /* DD 23 */ instr_inc<Register::IX>,
             /* DD 24 */ unimplemented_dd_instr<0x24>,
             /* DD 25 */ unimplemented_dd_instr<0x25>,
             /* DD 26 */ unimplemented_dd_instr<0x26>,
@@ -996,7 +1038,7 @@ namespace Z80 {
             /* DD 7B */ unimplemented_dd_instr<0x7B>,
             /* DD 7C */ unimplemented_dd_instr<0x7C>,
             /* DD 7D */ unimplemented_dd_instr<0x7D>,
-            /* DD 7E */ unimplemented_dd_instr<0x7E>,
+            /* DD 7E */ instr_ld<Register::A, AddressingMode::IXPlus>,
             /* DD 7F */ unimplemented_dd_instr<0x7F>,
             /* DD 80 */ unimplemented_dd_instr<0x80>,
             /* DD 81 */ unimplemented_dd_instr<0x81>,
@@ -1357,9 +1399,9 @@ namespace Z80 {
             /* FD 1E */ unimplemented_fd_instr<0x1E>,
             /* FD 1F */ unimplemented_fd_instr<0x1F>,
             /* FD 20 */ unimplemented_fd_instr<0x20>,
-            /* FD 21 */ unimplemented_fd_instr<0x21>,
+            /* FD 21 */ instr_ld<Register::IY, AddressingMode::Immediate>,
             /* FD 22 */ unimplemented_fd_instr<0x22>,
-            /* FD 23 */ unimplemented_fd_instr<0x23>,
+            /* FD 23 */ instr_inc<Register::IY>,
             /* FD 24 */ unimplemented_fd_instr<0x24>,
             /* FD 25 */ unimplemented_fd_instr<0x25>,
             /* FD 26 */ unimplemented_fd_instr<0x26>,
@@ -1450,7 +1492,7 @@ namespace Z80 {
             /* FD 7B */ unimplemented_fd_instr<0x7B>,
             /* FD 7C */ unimplemented_fd_instr<0x7C>,
             /* FD 7D */ unimplemented_fd_instr<0x7D>,
-            /* FD 7E */ unimplemented_fd_instr<0x7E>,
+            /* FD 7E */ instr_ld<Register::A, AddressingMode::IYPlus>,
             /* FD 7F */ unimplemented_fd_instr<0x7F>,
             /* FD 80 */ unimplemented_fd_instr<0x80>,
             /* FD 81 */ unimplemented_fd_instr<0x81>,

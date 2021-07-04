@@ -17,11 +17,14 @@ namespace {
         Always,
         Z,
         NZ,
+        C,
+        NC
     };
     enum class AddressingMode {
         Immediate,
         Indirect,
-        HL
+        HL,
+        BC
     };
 
     u16 read_16(u16 address) {
@@ -166,6 +169,10 @@ namespace {
                 return z80.f.z;
             case Condition::NZ:
                 return !z80.f.z;
+            case Condition::C:
+                return z80.f.c;
+            case Condition::NC:
+                return !z80.f.c;
         }
     }
 
@@ -176,6 +183,8 @@ namespace {
                 return read_16_pc();
             case AddressingMode::HL:
                 return z80.hl.raw;
+            case AddressingMode::BC:
+                return z80.bc.raw;
         }
     }
 
@@ -201,6 +210,8 @@ namespace {
             }
             case AddressingMode::HL:
                 return read_16(get_register<Register::HL>());
+            case AddressingMode::BC:
+                return read_16(get_register<Register::BC>());
         }
     }
 
@@ -283,6 +294,16 @@ namespace Z80 {
         }
     }
 
+    template <Condition c>
+    int instr_jr() {
+        if (check_condition<c>()) {
+            s8 offset = z80.read_byte(z80.pc++);
+            z80.pc += offset;
+            return 12;
+        }
+        return 7;
+    }
+
     template <Register reg, typename T = typename reg_type<reg>::type>
     int instr_dec() {
         switch (sizeof(T)) {
@@ -316,6 +337,9 @@ namespace Z80 {
                 u16 r = m + 1;
                 set_register<reg>(r);
                 return 6;
+            }
+            case sizeof(u8): {
+                logfatal("inc u8 (set flags and stuff)");
             }
         }
     }
@@ -571,17 +595,17 @@ namespace Z80 {
     const instruction instructions[0x100] = {
             /* 00 */ instr_nop,
             /* 01 */ instr_ld<Register::BC, AddressingMode::Immediate>,
-            /* 02 */ unimplemented_instr<0x02>,
-            /* 03 */ unimplemented_instr<0x03>,
-            /* 04 */ unimplemented_instr<0x04>,
-            /* 05 */ unimplemented_instr<0x05>,
+            /* 02 */ instr_ld<AddressingMode::BC, Register::A>,
+            /* 03 */ instr_inc<Register::BC>,
+            /* 04 */ instr_inc<Register::B>,
+            /* 05 */ instr_dec<Register::B>,
             /* 06 */ instr_ld<Register::B, AddressingMode::Immediate>,
             /* 07 */ instr_rlca,
             /* 08 */ instr_ex_af,
             /* 09 */ instr_add<Register::HL, Register::BC>,
-            /* 0A */ unimplemented_instr<0x0A>,
+            /* 0A */ instr_ld<Register::A, AddressingMode::BC>,
             /* 0B */ instr_dec<Register::BC>,
-            /* 0C */ unimplemented_instr<0x0C>,
+            /* 0C */ instr_inc<Register::C>,
             /* 0D */ instr_dec<Register::C>,
             /* 0E */ instr_ld<Register::C, AddressingMode::Immediate>,
             /* 0F */ instr_rrca,
@@ -593,7 +617,7 @@ namespace Z80 {
             /* 15 */ unimplemented_instr<0x15>,
             /* 16 */ instr_ld<Register::D, AddressingMode::Immediate>,
             /* 17 */ unimplemented_instr<0x17>,
-            /* 18 */ unimplemented_instr<0x18>,
+            /* 18 */ instr_jr<Condition::Always>,
             /* 19 */ instr_add<Register::HL, Register::DE>,
             /* 1A */ unimplemented_instr<0x1A>,
             /* 1B */ unimplemented_instr<0x1B>,
@@ -601,7 +625,7 @@ namespace Z80 {
             /* 1D */ instr_dec<Register::E>,
             /* 1E */ unimplemented_instr<0x1E>,
             /* 1F */ unimplemented_instr<0x1F>,
-            /* 20 */ unimplemented_instr<0x20>,
+            /* 20 */ instr_jr<Condition::NZ>,
             /* 21 */ instr_ld<Register::HL, AddressingMode::Immediate>,
             /* 22 */ unimplemented_instr<0x22>,
             /* 23 */ instr_inc<Register::HL>,
@@ -609,7 +633,7 @@ namespace Z80 {
             /* 25 */ unimplemented_instr<0x25>,
             /* 26 */ unimplemented_instr<0x26>,
             /* 27 */ unimplemented_instr<0x27>,
-            /* 28 */ unimplemented_instr<0x28>,
+            /* 28 */ instr_jr<Condition::Z>,
             /* 29 */ unimplemented_instr<0x29>,
             /* 2A */ instr_ld<Register::HL, AddressingMode::Indirect>,
             /* 2B */ instr_dec<Register::HL>,
@@ -617,7 +641,7 @@ namespace Z80 {
             /* 2D */ unimplemented_instr<0x2D>,
             /* 2E */ unimplemented_instr<0x2E>,
             /* 2F */ unimplemented_instr<0x2F>,
-            /* 30 */ unimplemented_instr<0x30>,
+            /* 30 */ instr_jr<Condition::NC>,
             /* 31 */ instr_ld<Register::SP, AddressingMode::Immediate>,
             /* 32 */ instr_ld<AddressingMode::Indirect, Register::A>,
             /* 33 */ unimplemented_instr<0x33>,
@@ -625,7 +649,7 @@ namespace Z80 {
             /* 35 */ unimplemented_instr<0x35>,
             /* 36 */ instr_ld<AddressingMode::HL, AddressingMode::Immediate>,
             /* 37 */ unimplemented_instr<0x37>,
-            /* 38 */ unimplemented_instr<0x38>,
+            /* 38 */ instr_jr<Condition::C>,
             /* 39 */ unimplemented_instr<0x39>,
             /* 3A */ instr_ld<Register::A, AddressingMode::Indirect>,
             /* 3B */ unimplemented_instr<0x3B>,
@@ -777,19 +801,19 @@ namespace Z80 {
             /* CD */ instr_call<Condition::Always>,
             /* CE */ unimplemented_instr<0xCE>,
             /* CF */ unimplemented_instr<0xCF>,
-            /* D0 */ unimplemented_instr<0xD0>,
+            /* D0 */ instr_ret<Condition::NC>,
             /* D1 */ instr_pop<Register::DE>,
-            /* D2 */ unimplemented_instr<0xD2>,
+            /* D2 */ instr_jp<Condition::NC, AddressingMode::Immediate>,
             /* D3 */ unimplemented_instr<0xD3>,
-            /* D4 */ unimplemented_instr<0xD4>,
+            /* D4 */ instr_call<Condition::NC>,
             /* D5 */ instr_push<Register::DE>,
             /* D6 */ unimplemented_instr<0xD6>,
             /* D7 */ unimplemented_instr<0xD7>,
-            /* D8 */ unimplemented_instr<0xD8>,
+            /* D8 */ instr_ret<Condition::C>,
             /* D9 */ instr_exx,
-            /* DA */ unimplemented_instr<0xDA>,
+            /* DA */ instr_jp<Condition::C, AddressingMode::Immediate>,
             /* DB */ instr_out, //unimplemented_instr<0xDB>,
-            /* DC */ unimplemented_instr<0xDC>,
+            /* DC */ instr_call<Condition::C>,
             /* DD */ instr_dd,
             /* DE */ unimplemented_instr<0xDE>,
             /* DF */ unimplemented_instr<0xDF>,

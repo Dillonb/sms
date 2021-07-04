@@ -73,6 +73,12 @@ namespace {
                 return z80.hl_;
             case Register::SP:
                 return z80.sp;
+            case Register::IX:
+                return z80.ix;
+            case Register::IY:
+                return z80.iy;
+            case Register::I:
+                return z80.i;
         }
     }
 
@@ -91,6 +97,7 @@ namespace {
                 break;
             case Register::AF_:
                 z80.af_ = value;
+                break;
             case Register::B:
                 z80.bc(Z80::WideRegister::Hi) = value;
                 break;
@@ -129,15 +136,23 @@ namespace {
                 break;
             case Register::SP:
                 z80.sp = value;
+                break;
             case Register::IX:
                 z80.ix = value;
+                break;
+            case Register::IY:
+                z80.iy = value;
+                break;
+            case Register::I:
+                z80.i = value;
+                break;
         }
     }
 
     template <Register a, Register b, typename aT = typename reg_type<a>::type, typename bT = typename reg_type<b>::type>
     void swap_registers() {
         static_assert(sizeof(aT) == sizeof(bT), "Types of swapped registers must be the same.");
-        u16 temp = get_register<a>();
+        aT temp = get_register<a>();
         set_register<a>(get_register<b>());
         set_register<b>(temp);
     }
@@ -243,6 +258,12 @@ namespace Z80 {
     template <u8 opc>
     int unimplemented_dd_instr() {
         printf("Unimplemented DD instruction %02X!\n", opc);
+        exit(1);
+    }
+
+    template <u8 opc>
+    int unimplemented_fd_instr() {
+        printf("Unimplemented FD instruction %02X!\n", opc);
         exit(1);
     }
 
@@ -422,6 +443,20 @@ namespace Z80 {
         return 4;
     }
 
+    template <AddressingMode src>
+    int instr_and() {
+        z80.a = z80.a & read_value<src, u8>();
+        z80.f.s = ((s8)z80.a) < 0;
+        z80.f.z = z80.a == 0;
+        z80.f.h = true;
+        z80.f.p_v = parity(z80.a);
+        z80.f.n = false;
+        z80.f.c = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
+        return 4;
+    }
+
     bool vflag(u8 a, u8 b, u8 r) {
         return ((a & 0x80) == (b & 0x80)) && ((a & 0x80) != (r & 0x80));
     }
@@ -437,8 +472,8 @@ namespace Z80 {
         z80.f.p_v = vflag(z80.a, ~s + 1, r);
         z80.f.n = true;
         z80.f.c = s > z80.a;
-        z80.f.b3 = (r >> 3) & 1;
-        z80.f.b5 = (r >> 5) & 1;
+        z80.f.b3 = (s >> 3) & 1;
+        z80.f.b5 = (s >> 5) & 1;
 
         return 7;
     }
@@ -468,12 +503,16 @@ namespace Z80 {
         return 4;
     }
 
+    int instr_dd() {
+        return dd_instructions[z80.read_byte(z80.pc++)]();
+    }
+
     int instr_ed() {
         return ed_instructions[z80.read_byte(z80.pc++)]();
     }
 
-    int instr_dd() {
-        return dd_instructions[z80.read_byte(z80.pc++)]();
+    int instr_fd() {
+        return fd_instructions[z80.read_byte(z80.pc++)]();
     }
 
     int instr_nop() {
@@ -576,7 +615,7 @@ namespace Z80 {
             /* 37 */ unimplemented_instr<0x37>,
             /* 38 */ unimplemented_instr<0x38>,
             /* 39 */ unimplemented_instr<0x39>,
-            /* 3A */ unimplemented_instr<0x3A>,
+            /* 3A */ instr_ld<Register::A, AddressingMode::Indirect>,
             /* 3B */ unimplemented_instr<0x3B>,
             /* 3C */ unimplemented_instr<0x3C>,
             /* 3D */ unimplemented_instr<0x3D>,
@@ -748,7 +787,7 @@ namespace Z80 {
             /* E3 */ unimplemented_instr<0xE3>,
             /* E4 */ unimplemented_instr<0xE4>,
             /* E5 */ instr_push<Register::HL>,
-            /* E6 */ unimplemented_instr<0xE6>,
+            /* E6 */ instr_and<AddressingMode::Immediate>,
             /* E7 */ unimplemented_instr<0xE7>,
             /* E8 */ unimplemented_instr<0xE8>,
             /* E9 */ unimplemented_instr<0xE9>,
@@ -771,7 +810,7 @@ namespace Z80 {
             /* FA */ unimplemented_instr<0xFA>,
             /* FB */ unimplemented_instr<0xFB>,
             /* FC */ unimplemented_instr<0xFC>,
-            /* FD */ unimplemented_instr<0xFD>,
+            /* FD */ instr_fd,
             /* FE */ instr_cp<AddressingMode::Immediate>,
             /* FF */ unimplemented_instr<0xFF>,
     };
@@ -1006,7 +1045,7 @@ namespace Z80 {
             /* DD E2 */ unimplemented_dd_instr<0xE2>,
             /* DD E3 */ unimplemented_dd_instr<0xE3>,
             /* DD E4 */ unimplemented_dd_instr<0xE4>,
-            /* DD E5 */ unimplemented_dd_instr<0xE5>,
+            /* DD E5 */ instr_push<Register::IX>,
             /* DD E6 */ unimplemented_dd_instr<0xE6>,
             /* DD E7 */ unimplemented_dd_instr<0xE7>,
             /* DD E8 */ unimplemented_dd_instr<0xE8>,
@@ -1228,5 +1267,264 @@ namespace Z80 {
             /* ED BD */ unimplemented_ed_instr<0xBD>,
             /* ED BE */ unimplemented_ed_instr<0xBE>,
             /* ED BF */ unimplemented_ed_instr<0xBF>,
+    };
+
+    const instruction fd_instructions[0x100] = {
+            /* FD 00 */ unimplemented_fd_instr<0x00>,
+            /* FD 01 */ unimplemented_fd_instr<0x01>,
+            /* FD 02 */ unimplemented_fd_instr<0x02>,
+            /* FD 03 */ unimplemented_fd_instr<0x03>,
+            /* FD 04 */ unimplemented_fd_instr<0x04>,
+            /* FD 05 */ unimplemented_fd_instr<0x05>,
+            /* FD 06 */ unimplemented_fd_instr<0x06>,
+            /* FD 07 */ unimplemented_fd_instr<0x07>,
+            /* FD 08 */ unimplemented_fd_instr<0x08>,
+            /* FD 09 */ unimplemented_fd_instr<0x09>,
+            /* FD 0A */ unimplemented_fd_instr<0x0A>,
+            /* FD 0B */ unimplemented_fd_instr<0x0B>,
+            /* FD 0C */ unimplemented_fd_instr<0x0C>,
+            /* FD 0D */ unimplemented_fd_instr<0x0D>,
+            /* FD 0E */ unimplemented_fd_instr<0x0E>,
+            /* FD 0F */ unimplemented_fd_instr<0x0F>,
+            /* FD 10 */ unimplemented_fd_instr<0x10>,
+            /* FD 11 */ unimplemented_fd_instr<0x11>,
+            /* FD 12 */ unimplemented_fd_instr<0x12>,
+            /* FD 13 */ unimplemented_fd_instr<0x13>,
+            /* FD 14 */ unimplemented_fd_instr<0x14>,
+            /* FD 15 */ unimplemented_fd_instr<0x15>,
+            /* FD 16 */ unimplemented_fd_instr<0x16>,
+            /* FD 17 */ unimplemented_fd_instr<0x17>,
+            /* FD 18 */ unimplemented_fd_instr<0x18>,
+            /* FD 19 */ unimplemented_fd_instr<0x19>,
+            /* FD 1A */ unimplemented_fd_instr<0x1A>,
+            /* FD 1B */ unimplemented_fd_instr<0x1B>,
+            /* FD 1C */ unimplemented_fd_instr<0x1C>,
+            /* FD 1D */ unimplemented_fd_instr<0x1D>,
+            /* FD 1E */ unimplemented_fd_instr<0x1E>,
+            /* FD 1F */ unimplemented_fd_instr<0x1F>,
+            /* FD 20 */ unimplemented_fd_instr<0x20>,
+            /* FD 21 */ unimplemented_fd_instr<0x21>,
+            /* FD 22 */ unimplemented_fd_instr<0x22>,
+            /* FD 23 */ unimplemented_fd_instr<0x23>,
+            /* FD 24 */ unimplemented_fd_instr<0x24>,
+            /* FD 25 */ unimplemented_fd_instr<0x25>,
+            /* FD 26 */ unimplemented_fd_instr<0x26>,
+            /* FD 27 */ unimplemented_fd_instr<0x27>,
+            /* FD 28 */ unimplemented_fd_instr<0x28>,
+            /* FD 29 */ unimplemented_fd_instr<0x29>,
+            /* FD 2A */ unimplemented_fd_instr<0x2A>,
+            /* FD 2B */ unimplemented_fd_instr<0x2B>,
+            /* FD 2C */ unimplemented_fd_instr<0x2C>,
+            /* FD 2D */ unimplemented_fd_instr<0x2D>,
+            /* FD 2E */ unimplemented_fd_instr<0x2E>,
+            /* FD 2F */ unimplemented_fd_instr<0x2F>,
+            /* FD 30 */ unimplemented_fd_instr<0x30>,
+            /* FD 31 */ unimplemented_fd_instr<0x31>,
+            /* FD 32 */ unimplemented_fd_instr<0x32>,
+            /* FD 33 */ unimplemented_fd_instr<0x33>,
+            /* FD 34 */ unimplemented_fd_instr<0x34>,
+            /* FD 35 */ unimplemented_fd_instr<0x35>,
+            /* FD 36 */ unimplemented_fd_instr<0x36>,
+            /* FD 37 */ unimplemented_fd_instr<0x37>,
+            /* FD 38 */ unimplemented_fd_instr<0x38>,
+            /* FD 39 */ unimplemented_fd_instr<0x39>,
+            /* FD 3A */ unimplemented_fd_instr<0x3A>,
+            /* FD 3B */ unimplemented_fd_instr<0x3B>,
+            /* FD 3C */ unimplemented_fd_instr<0x3C>,
+            /* FD 3D */ unimplemented_fd_instr<0x3D>,
+            /* FD 3E */ unimplemented_fd_instr<0x3E>,
+            /* FD 3F */ unimplemented_fd_instr<0x3F>,
+            /* FD 40 */ unimplemented_fd_instr<0x40>,
+            /* FD 41 */ unimplemented_fd_instr<0x41>,
+            /* FD 42 */ unimplemented_fd_instr<0x42>,
+            /* FD 43 */ unimplemented_fd_instr<0x43>,
+            /* FD 44 */ unimplemented_fd_instr<0x44>,
+            /* FD 45 */ unimplemented_fd_instr<0x45>,
+            /* FD 46 */ unimplemented_fd_instr<0x46>,
+            /* FD 47 */ unimplemented_fd_instr<0x47>,
+            /* FD 48 */ unimplemented_fd_instr<0x48>,
+            /* FD 49 */ unimplemented_fd_instr<0x49>,
+            /* FD 4A */ unimplemented_fd_instr<0x4A>,
+            /* FD 4B */ unimplemented_fd_instr<0x4B>,
+            /* FD 4C */ unimplemented_fd_instr<0x4C>,
+            /* FD 4D */ unimplemented_fd_instr<0x4D>,
+            /* FD 4E */ unimplemented_fd_instr<0x4E>,
+            /* FD 4F */ unimplemented_fd_instr<0x4F>,
+            /* FD 50 */ unimplemented_fd_instr<0x50>,
+            /* FD 51 */ unimplemented_fd_instr<0x51>,
+            /* FD 52 */ unimplemented_fd_instr<0x52>,
+            /* FD 53 */ unimplemented_fd_instr<0x53>,
+            /* FD 54 */ unimplemented_fd_instr<0x54>,
+            /* FD 55 */ unimplemented_fd_instr<0x55>,
+            /* FD 56 */ unimplemented_fd_instr<0x56>,
+            /* FD 57 */ unimplemented_fd_instr<0x57>,
+            /* FD 58 */ unimplemented_fd_instr<0x58>,
+            /* FD 59 */ unimplemented_fd_instr<0x59>,
+            /* FD 5A */ unimplemented_fd_instr<0x5A>,
+            /* FD 5B */ unimplemented_fd_instr<0x5B>,
+            /* FD 5C */ unimplemented_fd_instr<0x5C>,
+            /* FD 5D */ unimplemented_fd_instr<0x5D>,
+            /* FD 5E */ unimplemented_fd_instr<0x5E>,
+            /* FD 5F */ unimplemented_fd_instr<0x5F>,
+            /* FD 60 */ unimplemented_fd_instr<0x60>,
+            /* FD 61 */ unimplemented_fd_instr<0x61>,
+            /* FD 62 */ unimplemented_fd_instr<0x62>,
+            /* FD 63 */ unimplemented_fd_instr<0x63>,
+            /* FD 64 */ unimplemented_fd_instr<0x64>,
+            /* FD 65 */ unimplemented_fd_instr<0x65>,
+            /* FD 66 */ unimplemented_fd_instr<0x66>,
+            /* FD 67 */ unimplemented_fd_instr<0x67>,
+            /* FD 68 */ unimplemented_fd_instr<0x68>,
+            /* FD 69 */ unimplemented_fd_instr<0x69>,
+            /* FD 6A */ unimplemented_fd_instr<0x6A>,
+            /* FD 6B */ unimplemented_fd_instr<0x6B>,
+            /* FD 6C */ unimplemented_fd_instr<0x6C>,
+            /* FD 6D */ unimplemented_fd_instr<0x6D>,
+            /* FD 6E */ unimplemented_fd_instr<0x6E>,
+            /* FD 6F */ unimplemented_fd_instr<0x6F>,
+            /* FD 70 */ unimplemented_fd_instr<0x70>,
+            /* FD 71 */ unimplemented_fd_instr<0x71>,
+            /* FD 72 */ unimplemented_fd_instr<0x72>,
+            /* FD 73 */ unimplemented_fd_instr<0x73>,
+            /* FD 74 */ unimplemented_fd_instr<0x74>,
+            /* FD 75 */ unimplemented_fd_instr<0x75>,
+            /* FD 76 */ unimplemented_fd_instr<0x76>,
+            /* FD 77 */ unimplemented_fd_instr<0x77>,
+            /* FD 78 */ unimplemented_fd_instr<0x78>,
+            /* FD 79 */ unimplemented_fd_instr<0x79>,
+            /* FD 7A */ unimplemented_fd_instr<0x7A>,
+            /* FD 7B */ unimplemented_fd_instr<0x7B>,
+            /* FD 7C */ unimplemented_fd_instr<0x7C>,
+            /* FD 7D */ unimplemented_fd_instr<0x7D>,
+            /* FD 7E */ unimplemented_fd_instr<0x7E>,
+            /* FD 7F */ unimplemented_fd_instr<0x7F>,
+            /* FD 80 */ unimplemented_fd_instr<0x80>,
+            /* FD 81 */ unimplemented_fd_instr<0x81>,
+            /* FD 82 */ unimplemented_fd_instr<0x82>,
+            /* FD 83 */ unimplemented_fd_instr<0x83>,
+            /* FD 84 */ unimplemented_fd_instr<0x84>,
+            /* FD 85 */ unimplemented_fd_instr<0x85>,
+            /* FD 86 */ unimplemented_fd_instr<0x86>,
+            /* FD 87 */ unimplemented_fd_instr<0x87>,
+            /* FD 88 */ unimplemented_fd_instr<0x88>,
+            /* FD 89 */ unimplemented_fd_instr<0x89>,
+            /* FD 8A */ unimplemented_fd_instr<0x8A>,
+            /* FD 8B */ unimplemented_fd_instr<0x8B>,
+            /* FD 8C */ unimplemented_fd_instr<0x8C>,
+            /* FD 8D */ unimplemented_fd_instr<0x8D>,
+            /* FD 8E */ unimplemented_fd_instr<0x8E>,
+            /* FD 8F */ unimplemented_fd_instr<0x8F>,
+            /* FD 90 */ unimplemented_fd_instr<0x90>,
+            /* FD 91 */ unimplemented_fd_instr<0x91>,
+            /* FD 92 */ unimplemented_fd_instr<0x92>,
+            /* FD 93 */ unimplemented_fd_instr<0x93>,
+            /* FD 94 */ unimplemented_fd_instr<0x94>,
+            /* FD 95 */ unimplemented_fd_instr<0x95>,
+            /* FD 96 */ unimplemented_fd_instr<0x96>,
+            /* FD 97 */ unimplemented_fd_instr<0x97>,
+            /* FD 98 */ unimplemented_fd_instr<0x98>,
+            /* FD 99 */ unimplemented_fd_instr<0x99>,
+            /* FD 9A */ unimplemented_fd_instr<0x9A>,
+            /* FD 9B */ unimplemented_fd_instr<0x9B>,
+            /* FD 9C */ unimplemented_fd_instr<0x9C>,
+            /* FD 9D */ unimplemented_fd_instr<0x9D>,
+            /* FD 9E */ unimplemented_fd_instr<0x9E>,
+            /* FD 9F */ unimplemented_fd_instr<0x9F>,
+            /* FD A0 */ unimplemented_fd_instr<0xA0>,
+            /* FD A1 */ unimplemented_fd_instr<0xA1>,
+            /* FD A2 */ unimplemented_fd_instr<0xA2>,
+            /* FD A3 */ unimplemented_fd_instr<0xA3>,
+            /* FD A4 */ unimplemented_fd_instr<0xA4>,
+            /* FD A5 */ unimplemented_fd_instr<0xA5>,
+            /* FD A6 */ unimplemented_fd_instr<0xA6>,
+            /* FD A7 */ unimplemented_fd_instr<0xA7>,
+            /* FD A8 */ unimplemented_fd_instr<0xA8>,
+            /* FD A9 */ unimplemented_fd_instr<0xA9>,
+            /* FD AA */ unimplemented_fd_instr<0xAA>,
+            /* FD AB */ unimplemented_fd_instr<0xAB>,
+            /* FD AC */ unimplemented_fd_instr<0xAC>,
+            /* FD AD */ unimplemented_fd_instr<0xAD>,
+            /* FD AE */ unimplemented_fd_instr<0xAE>,
+            /* FD AF */ unimplemented_fd_instr<0xAF>,
+            /* FD B0 */ unimplemented_fd_instr<0xB0>,
+            /* FD B1 */ unimplemented_fd_instr<0xB1>,
+            /* FD B2 */ unimplemented_fd_instr<0xB2>,
+            /* FD B3 */ unimplemented_fd_instr<0xB3>,
+            /* FD B4 */ unimplemented_fd_instr<0xB4>,
+            /* FD B5 */ unimplemented_fd_instr<0xB5>,
+            /* FD B6 */ unimplemented_fd_instr<0xB6>,
+            /* FD B7 */ unimplemented_fd_instr<0xB7>,
+            /* FD B8 */ unimplemented_fd_instr<0xB8>,
+            /* FD B9 */ unimplemented_fd_instr<0xB9>,
+            /* FD BA */ unimplemented_fd_instr<0xBA>,
+            /* FD BB */ unimplemented_fd_instr<0xBB>,
+            /* FD BC */ unimplemented_fd_instr<0xBC>,
+            /* FD BD */ unimplemented_fd_instr<0xBD>,
+            /* FD BE */ unimplemented_fd_instr<0xBE>,
+            /* FD BF */ unimplemented_fd_instr<0xBF>,
+            /* FD C0 */ unimplemented_fd_instr<0xC0>,
+            /* FD C1 */ unimplemented_fd_instr<0xC1>,
+            /* FD C2 */ unimplemented_fd_instr<0xC2>,
+            /* FD C3 */ unimplemented_fd_instr<0xC3>,
+            /* FD C4 */ unimplemented_fd_instr<0xC4>,
+            /* FD C5 */ unimplemented_fd_instr<0xC5>,
+            /* FD C6 */ unimplemented_fd_instr<0xC6>,
+            /* FD C7 */ unimplemented_fd_instr<0xC7>,
+            /* FD C8 */ unimplemented_fd_instr<0xC8>,
+            /* FD C9 */ unimplemented_fd_instr<0xC9>,
+            /* FD CA */ unimplemented_fd_instr<0xCA>,
+            /* FD CB */ unimplemented_fd_instr<0xCB>,
+            /* FD CC */ unimplemented_fd_instr<0xCC>,
+            /* FD CD */ unimplemented_fd_instr<0xCD>,
+            /* FD CE */ unimplemented_fd_instr<0xCE>,
+            /* FD CF */ unimplemented_fd_instr<0xCF>,
+            /* FD D0 */ unimplemented_fd_instr<0xD0>,
+            /* FD D1 */ unimplemented_fd_instr<0xD1>,
+            /* FD D2 */ unimplemented_fd_instr<0xD2>,
+            /* FD D3 */ unimplemented_fd_instr<0xD3>,
+            /* FD D4 */ unimplemented_fd_instr<0xD4>,
+            /* FD D5 */ unimplemented_fd_instr<0xD5>,
+            /* FD D6 */ unimplemented_fd_instr<0xD6>,
+            /* FD D7 */ unimplemented_fd_instr<0xD7>,
+            /* FD D8 */ unimplemented_fd_instr<0xD8>,
+            /* FD D9 */ unimplemented_fd_instr<0xD9>,
+            /* FD DA */ unimplemented_fd_instr<0xDA>,
+            /* FD DB */ unimplemented_fd_instr<0xDB>,
+            /* FD DC */ unimplemented_fd_instr<0xDC>,
+            /* FD DD */ unimplemented_fd_instr<0xDD>,
+            /* FD DE */ unimplemented_fd_instr<0xDE>,
+            /* FD DF */ unimplemented_fd_instr<0xDF>,
+            /* FD E0 */ unimplemented_fd_instr<0xE0>,
+            /* FD E1 */ instr_pop<Register::IY>,
+            /* FD E2 */ unimplemented_fd_instr<0xE2>,
+            /* FD E3 */ unimplemented_fd_instr<0xE3>,
+            /* FD E4 */ unimplemented_fd_instr<0xE4>,
+            /* FD E5 */ instr_push<Register::IY>,
+            /* FD E6 */ unimplemented_fd_instr<0xE6>,
+            /* FD E7 */ unimplemented_fd_instr<0xE7>,
+            /* FD E8 */ unimplemented_fd_instr<0xE8>,
+            /* FD E9 */ unimplemented_fd_instr<0xE9>,
+            /* FD EA */ unimplemented_fd_instr<0xEA>,
+            /* FD EB */ unimplemented_fd_instr<0xEB>,
+            /* FD EC */ unimplemented_fd_instr<0xEC>,
+            /* FD ED */ unimplemented_fd_instr<0xED>,
+            /* FD EE */ unimplemented_fd_instr<0xEE>,
+            /* FD EF */ unimplemented_fd_instr<0xEF>,
+            /* FD F0 */ unimplemented_fd_instr<0xF0>,
+            /* FD F1 */ unimplemented_fd_instr<0xF1>,
+            /* FD F2 */ unimplemented_fd_instr<0xF2>,
+            /* FD F3 */ unimplemented_fd_instr<0xF3>,
+            /* FD F4 */ unimplemented_fd_instr<0xF4>,
+            /* FD F5 */ unimplemented_fd_instr<0xF5>,
+            /* FD F6 */ unimplemented_fd_instr<0xF6>,
+            /* FD F7 */ unimplemented_fd_instr<0xF7>,
+            /* FD F8 */ unimplemented_fd_instr<0xF8>,
+            /* FD F9 */ unimplemented_fd_instr<0xF9>,
+            /* FD FA */ unimplemented_fd_instr<0xFA>,
+            /* FD FB */ unimplemented_fd_instr<0xFB>,
+            /* FD FC */ unimplemented_fd_instr<0xFC>,
+            /* FD FD */ unimplemented_fd_instr<0xFD>,
+            /* FD FE */ unimplemented_fd_instr<0xFE>,
+            /* FD FF */ unimplemented_fd_instr<0xFF>,
     };
 }

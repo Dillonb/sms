@@ -45,11 +45,11 @@ bool check(const char* field, const std::string& expected, const u16 actual) {
 PC: 0125, AF: C384, BC: 0009, DE: 1DDA, HL: 013B, SP: C900, IX: 0000, IY: 0000, I: 00, R: 16	(CA 2F 01 2B), cyc: 228
  */
 void check_log(std::string& line) {
+    //std::cout << "checking: '" << line << "'" << endl;
     bool any_bad = check("PC", line.substr(4, 4), Z80::z80.pc);
     u16 af = Z80::z80.a;
     af <<= 8;
     af |= Z80::z80.f.assemble();
-    //std::cout << "checking: " << line << endl;
     any_bad |= check("AF", line.substr(14, 4), af);
     any_bad |= check("BC", line.substr(24, 4), Z80::z80.bc.raw);
     any_bad |= check("DE", line.substr(34, 4), Z80::z80.de.raw);
@@ -72,8 +72,15 @@ int main(int argc, char** argv) {
     bool log_loaded = false;
     std::ifstream f;
     if (argc == 3) {
+        cout << "Loading log!" << endl;
         log_loaded = true;
         f = std::ifstream(argv[2]);
+        if (f.fail()) {
+            cout << "Failed loading log!" << endl;
+            exit(1);
+        }
+    } else {
+        cout << "No log loaded." << endl;
     }
 
     memset(memory, 0x00, 65535);

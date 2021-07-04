@@ -1,7 +1,7 @@
 #include "z80.h"
 
 #include <cstdio>
-#include <cstdlib>
+#include <cstring>
 
 #include "util/log.h"
 
@@ -11,6 +11,7 @@ namespace Z80 {
     z80_t z80;
 
     void reset() {
+        memset(&z80, 0, sizeof(z80_t));
         z80.a = 0xFF;
         z80.f.set(0xFF);
         z80.sp = 0xFFFF;

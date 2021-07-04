@@ -497,6 +497,14 @@ namespace Z80 {
         return 16;
     }
 
+    int instr_rlca() {
+        z80.a = std::rotl(z80.a, 1);
+        z80.f.n = z80.a & 1;
+        z80.f.n = false;
+        z80.f.h = false;
+        return 4;
+    }
+
     const instruction instructions[0x100] = {
             /* 00 */ instr_nop,
             /* 01 */ instr_ld<Register::BC, AddressingMode::Immediate>,
@@ -505,7 +513,7 @@ namespace Z80 {
             /* 04 */ unimplemented_instr<0x04>,
             /* 05 */ unimplemented_instr<0x05>,
             /* 06 */ instr_ld<Register::B, AddressingMode::Immediate>,
-            /* 07 */ unimplemented_instr<0x07>,
+            /* 07 */ instr_rlca,
             /* 08 */ instr_ex_af,
             /* 09 */ instr_add<Register::HL, Register::BC>,
             /* 0A */ unimplemented_instr<0x0A>,

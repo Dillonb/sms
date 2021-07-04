@@ -396,7 +396,22 @@ namespace Z80 {
             z80.f.c = res > 0xFFFF;
             return 11;
         }
-        logfatal("aaa");
+        logfatal("Should not reach here, or time to implement 8 bit adds");
+    }
+
+    template <Register src, typename T = typename reg_type<src>::type>
+    int instr_and() {
+        static_assert(std::is_same_v<T, u8>, "Only defined for 8 bit regs");
+        z80.a = z80.a & get_register<src>();
+        z80.f.s = ((s8)z80.a) < 0;
+        z80.f.z = z80.a == 0;
+        z80.f.h = true;
+        z80.f.p_v = parity(z80.a);
+        z80.f.n = false;
+        z80.f.c = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
+        return 4;
     }
 
     bool vflag(u8 a, u8 b, u8 r) {
@@ -604,7 +619,7 @@ namespace Z80 {
             /* 76 */ unimplemented_instr<0x76>,
             /* 77 */ unimplemented_instr<0x77>,
             /* 78 */ unimplemented_instr<0x78>,
-            /* 79 */ unimplemented_instr<0x79>,
+            /* 79 */ instr_ld<Register::A, Register::C>,
             /* 7A */ unimplemented_instr<0x7A>,
             /* 7B */ instr_ld<Register::A, Register::E>,
             /* 7C */ instr_ld<Register::A, Register::H>,
@@ -644,7 +659,7 @@ namespace Z80 {
             /* 9E */ unimplemented_instr<0x9E>,
             /* 9F */ unimplemented_instr<0x9F>,
             /* A0 */ unimplemented_instr<0xA0>,
-            /* A1 */ unimplemented_instr<0xA1>,
+            /* A1 */ instr_and<Register::C>,
             /* A2 */ unimplemented_instr<0xA2>,
             /* A3 */ unimplemented_instr<0xA3>,
             /* A4 */ unimplemented_instr<0xA4>,

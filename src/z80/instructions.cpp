@@ -550,9 +550,21 @@ namespace Z80 {
 
     int instr_rlca() {
         z80.a = std::rotl(z80.a, 1);
-        z80.f.n = z80.a & 1;
+        z80.f.c = z80.a & 1;
         z80.f.n = false;
         z80.f.h = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
+        return 4;
+    }
+
+    int instr_rrca() {
+        z80.f.c = z80.a & 1;
+        z80.a = std::rotr(z80.a, 1);
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
         return 4;
     }
 
@@ -572,7 +584,7 @@ namespace Z80 {
             /* 0C */ unimplemented_instr<0x0C>,
             /* 0D */ instr_dec<Register::C>,
             /* 0E */ instr_ld<Register::C, AddressingMode::Immediate>,
-            /* 0F */ unimplemented_instr<0x0F>,
+            /* 0F */ instr_rrca,
             /* 10 */ unimplemented_instr<0x10>,
             /* 11 */ instr_ld<Register::DE, AddressingMode::Immediate>,
             /* 12 */ unimplemented_instr<0x12>,
@@ -669,22 +681,22 @@ namespace Z80 {
             /* 6D */ unimplemented_instr<0x6D>,
             /* 6E */ unimplemented_instr<0x6E>,
             /* 6F */ instr_ld<Register::L, Register::A>,
-            /* 70 */ unimplemented_instr<0x70>,
-            /* 71 */ unimplemented_instr<0x71>,
-            /* 72 */ unimplemented_instr<0x72>,
-            /* 73 */ unimplemented_instr<0x73>,
-            /* 74 */ unimplemented_instr<0x74>,
-            /* 75 */ unimplemented_instr<0x75>,
+            /* 70 */ instr_ld<AddressingMode::HL, Register::B>,
+            /* 71 */ instr_ld<AddressingMode::HL, Register::C>,
+            /* 72 */ instr_ld<AddressingMode::HL, Register::D>,
+            /* 73 */ instr_ld<AddressingMode::HL, Register::E>,
+            /* 74 */ instr_ld<AddressingMode::HL, Register::H>,
+            /* 75 */ instr_ld<AddressingMode::HL, Register::L>,
             /* 76 */ unimplemented_instr<0x76>,
-            /* 77 */ unimplemented_instr<0x77>,
-            /* 78 */ unimplemented_instr<0x78>,
+            /* 77 */ instr_ld<AddressingMode::HL, Register::A>,
+            /* 78 */ instr_ld<Register::A, Register::B>,
             /* 79 */ instr_ld<Register::A, Register::C>,
-            /* 7A */ unimplemented_instr<0x7A>,
+            /* 7A */ instr_ld<Register::A, Register::D>,
             /* 7B */ instr_ld<Register::A, Register::E>,
             /* 7C */ instr_ld<Register::A, Register::H>,
             /* 7D */ instr_ld<Register::A, Register::L>,
             /* 7E */ instr_ld<Register::A, AddressingMode::HL>,
-            /* 7F */ unimplemented_instr<0x7F>,
+            /* 7F */ instr_ld<Register::A, Register::A>,
             /* 80 */ unimplemented_instr<0x80>,
             /* 81 */ unimplemented_instr<0x81>,
             /* 82 */ unimplemented_instr<0x82>,

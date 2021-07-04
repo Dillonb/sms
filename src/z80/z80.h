@@ -24,6 +24,9 @@ namespace Z80 {
         Util::Bitfield<WideRegister> hl;
         u16 pc;
         u16 sp;
+        u8 i;
+        u16 ix;
+        u16 iy;
 
         // Shadow registers
         u16 af_, bc_, de_, hl_;

@@ -62,6 +62,10 @@ namespace Z80 {
         HL,
         HL_,
 
+        I,
+        IX,
+        IY,
+
         SP,
     };
 
@@ -89,6 +93,11 @@ namespace Z80 {
     template<> struct reg_type<Register::L> { using type = u8; };
     template<> struct reg_type<Register::HL> { using type = u16; };
     template<> struct reg_type<Register::HL_> { using type = u16; };
+
+    template<> struct reg_type<Register::I> { using type = u8; };
+    template<> struct reg_type<Register::IX> { using type = u16; };
+    template<> struct reg_type<Register::IY> { using type = u16; };
+
 
     template<> struct reg_type<Register::SP> { using type = u16; };
 

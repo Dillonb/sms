@@ -55,6 +55,9 @@ void check_log(std::string& line) {
     any_bad |= check("DE", line.substr(34, 4), Z80::z80.de.raw);
     any_bad |= check("HL", line.substr(44, 4), Z80::z80.hl.raw);
     any_bad |= check("SP", line.substr(54, 4), Z80::z80.sp);
+    any_bad |= check("IX", line.substr(64, 4), Z80::z80.ix);
+    any_bad |= check("IY", line.substr(74, 4), Z80::z80.iy);
+    any_bad |= check("I",  line.substr(83, 2), Z80::z80.i);
 
     if (any_bad) {
         exit(1);

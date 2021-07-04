@@ -15,16 +15,22 @@ using Z80::reg_type;
 namespace {
     enum class Condition {
         Always,
-        Z,
-        NZ,
-        C,
-        NC
+        Z, // Z flag is set
+        NZ, // Z flag is reset
+        C, // C flag is set
+        NC, // C flag is reset
+        M, // S flag is set
+        P, // Set flag is reset
+        PE, // P/V flag is set
+        PO, // P/V flag is reset
     };
     enum class AddressingMode {
         Immediate,
         Indirect,
         HL,
-        BC
+        BC,
+        IX,
+        IY
     };
 
     u16 read_16(u16 address) {
@@ -173,6 +179,14 @@ namespace {
                 return z80.f.c;
             case Condition::NC:
                 return !z80.f.c;
+            case Condition::M:
+                return z80.f.s;
+            case Condition::P:
+                return !z80.f.s;
+            case Condition::PE:
+                return z80.f.p_v;
+            case Condition::PO:
+                return !z80.f.p_v;
         }
     }
 
@@ -185,6 +199,10 @@ namespace {
                 return z80.hl.raw;
             case AddressingMode::BC:
                 return z80.bc.raw;
+            case AddressingMode::IX:
+                return z80.ix;
+            case AddressingMode::IY:
+                return z80.iy;
         }
     }
 
@@ -280,7 +298,7 @@ namespace Z80 {
 
     template <Condition c, AddressingMode addressingMode>
     int instr_jp() {
-        u16 address = read_16_pc();
+        u16 address = get_address<addressingMode>();
 
         if (check_condition<c>()) {
             z80.pc = address;
@@ -785,25 +803,25 @@ namespace Z80 {
             /* BD */ unimplemented_instr<0xBD>,
             /* BE */ unimplemented_instr<0xBE>,
             /* BF */ unimplemented_instr<0xBF>,
-            /* C0 */ unimplemented_instr<0xC0>,
+            /* C0 */ instr_ret<Condition::NZ>,
             /* C1 */ instr_pop<Register::BC>,
-            /* C2 */ instr_jp<Condition::NZ, AddressingMode::Immediate>,
-            /* C3 */ instr_jp<Condition::Always, AddressingMode::Immediate>,
-            /* C4 */ unimplemented_instr<0xC4>,
+            /* C2 */ instr_jp<Condition::NZ, AddressingMode::Indirect>,
+            /* C3 */ instr_jp<Condition::Always, AddressingMode::Indirect>,
+            /* C4 */ instr_call<Condition::NZ>,
             /* C5 */ instr_push<Register::BC>,
             /* C6 */ unimplemented_instr<0xC6>,
             /* C7 */ unimplemented_instr<0xC7>,
-            /* C8 */ unimplemented_instr<0xC8>,
+            /* C8 */ instr_ret<Condition::Z>,
             /* C9 */ instr_ret<Condition::Always>,
-            /* CA */ instr_jp<Condition::Z, AddressingMode::Immediate>,
+            /* CA */ instr_jp<Condition::Z, AddressingMode::Indirect>,
             /* CB */ unimplemented_instr<0xCB>,
-            /* CC */ unimplemented_instr<0xCC>,
+            /* CC */ instr_call<Condition::Z>,
             /* CD */ instr_call<Condition::Always>,
             /* CE */ unimplemented_instr<0xCE>,
             /* CF */ unimplemented_instr<0xCF>,
             /* D0 */ instr_ret<Condition::NC>,
             /* D1 */ instr_pop<Register::DE>,
-            /* D2 */ instr_jp<Condition::NC, AddressingMode::Immediate>,
+            /* D2 */ instr_jp<Condition::NC, AddressingMode::Indirect>,
             /* D3 */ unimplemented_instr<0xD3>,
             /* D4 */ instr_call<Condition::NC>,
             /* D5 */ instr_push<Register::DE>,
@@ -811,41 +829,41 @@ namespace Z80 {
             /* D7 */ unimplemented_instr<0xD7>,
             /* D8 */ instr_ret<Condition::C>,
             /* D9 */ instr_exx,
-            /* DA */ instr_jp<Condition::C, AddressingMode::Immediate>,
+            /* DA */ instr_jp<Condition::C, AddressingMode::Indirect>,
             /* DB */ instr_out, //unimplemented_instr<0xDB>,
             /* DC */ instr_call<Condition::C>,
             /* DD */ instr_dd,
             /* DE */ unimplemented_instr<0xDE>,
             /* DF */ unimplemented_instr<0xDF>,
-            /* E0 */ unimplemented_instr<0xE0>,
+            /* E0 */ instr_ret<Condition::PO>,
             /* E1 */ instr_pop<Register::HL>,
-            /* E2 */ unimplemented_instr<0xE2>,
+            /* E2 */ instr_jp<Condition::PO, AddressingMode::Indirect>,
             /* E3 */ unimplemented_instr<0xE3>,
-            /* E4 */ unimplemented_instr<0xE4>,
+            /* E4 */ instr_call<Condition::PO>,
             /* E5 */ instr_push<Register::HL>,
             /* E6 */ instr_and<AddressingMode::Immediate>,
             /* E7 */ unimplemented_instr<0xE7>,
-            /* E8 */ unimplemented_instr<0xE8>,
-            /* E9 */ unimplemented_instr<0xE9>,
-            /* EA */ unimplemented_instr<0xEA>,
+            /* E8 */ instr_ret<Condition::PE>,
+            /* E9 */ instr_jp<Condition::Always, AddressingMode::HL>,
+            /* EA */ instr_jp<Condition::PE, AddressingMode::Indirect>,
             /* EB */ instr_ex_de_hl,
-            /* EC */ unimplemented_instr<0xEC>,
+            /* EC */ instr_call<Condition::PE>,
             /* ED */ instr_ed,
             /* EE */ unimplemented_instr<0xEE>,
             /* EF */ unimplemented_instr<0xEF>,
-            /* F0 */ unimplemented_instr<0xF0>,
+            /* F0 */ instr_ret<Condition::P>,
             /* F1 */ instr_pop<Register::AF>,
-            /* F2 */ unimplemented_instr<0xF2>,
+            /* F2 */ instr_jp<Condition::P, AddressingMode::Indirect>,
             /* F3 */ unimplemented_instr<0xF3>,
-            /* F4 */ unimplemented_instr<0xF4>,
+            /* F4 */ instr_call<Condition::P>,
             /* F5 */ instr_push<Register::AF>,
             /* F6 */ unimplemented_instr<0xF6>,
             /* F7 */ unimplemented_instr<0xF7>,
-            /* F8 */ unimplemented_instr<0xF8>,
+            /* F8 */ instr_ret<Condition::M>,
             /* F9 */ instr_ld<Register::SP, Register::HL>,
-            /* FA */ unimplemented_instr<0xFA>,
+            /* FA */ instr_jp<Condition::M, AddressingMode::Indirect>,
             /* FB */ unimplemented_instr<0xFB>,
-            /* FC */ unimplemented_instr<0xFC>,
+            /* FC */ instr_call<Condition::M>,
             /* FD */ instr_fd,
             /* FE */ instr_cp<AddressingMode::Immediate>,
             /* FF */ unimplemented_instr<0xFF>,
@@ -1085,7 +1103,7 @@ namespace Z80 {
             /* DD E6 */ unimplemented_dd_instr<0xE6>,
             /* DD E7 */ unimplemented_dd_instr<0xE7>,
             /* DD E8 */ unimplemented_dd_instr<0xE8>,
-            /* DD E9 */ unimplemented_dd_instr<0xE9>,
+            /* DD E9 */ instr_jp<Condition::Always, AddressingMode::IX>,
             /* DD EA */ unimplemented_dd_instr<0xEA>,
             /* DD EB */ unimplemented_dd_instr<0xEB>,
             /* DD EC */ unimplemented_dd_instr<0xEC>,
@@ -1539,7 +1557,7 @@ namespace Z80 {
             /* FD E6 */ unimplemented_fd_instr<0xE6>,
             /* FD E7 */ unimplemented_fd_instr<0xE7>,
             /* FD E8 */ unimplemented_fd_instr<0xE8>,
-            /* FD E9 */ unimplemented_fd_instr<0xE9>,
+            /* FD E9 */ instr_jp<Condition::Always, AddressingMode::IY>,
             /* FD EA */ unimplemented_fd_instr<0xEA>,
             /* FD EB */ unimplemented_fd_instr<0xEB>,
             /* FD EC */ unimplemented_fd_instr<0xEC>,

@@ -86,6 +86,10 @@ u8 port_in(u8 port) {
             }
             break;
         }
+        case 2: {
+            printf("%c", Z80::z80.de[Z80::WideRegister::Lo]);
+            break;
+        }
         default:
             logfatal("Unknown syscall %d!", syscall);
     }
@@ -134,7 +138,15 @@ int main(int argc, char** argv) {
     while (!should_quit) {
         if (log_loaded) {
             getline(f, line);
-            check_log(line);
+            if (f.eof()) {
+                printf("WARNING: end of log file!\n");
+                log_loaded = false;
+            }
+            if (line.empty()) {
+                printf("WARNING: log line empty, skipping!\n");
+            } else {
+                check_log(line);
+            }
         }
         Z80::step();
     }

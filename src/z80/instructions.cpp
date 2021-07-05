@@ -29,6 +29,7 @@ namespace {
         Indirect,
         HL,
         BC,
+        DE,
         IX,
         IXPlus,
         IY,
@@ -195,59 +196,44 @@ namespace {
     template <AddressingMode addressingMode>
     u16 get_address() {
         switch (addressingMode) {
+            case AddressingMode::Immediate:
+                logfatal("get_address() should not be used with the immediate addressing mode!");
             case AddressingMode::Indirect:
                 return read_16_pc();
             case AddressingMode::HL:
                 return z80.hl.raw;
             case AddressingMode::BC:
                 return z80.bc.raw;
+            case AddressingMode::DE:
+                return z80.de.raw;
             case AddressingMode::IX:
                 return z80.ix;
             case AddressingMode::IY:
                 return z80.iy;
+            case AddressingMode::IXPlus:
+                return get_register<Register::IX>() + (s8)z80.read_byte(z80.pc++);
+            case AddressingMode::IYPlus:
+                return get_register<Register::IY>() + (s8)z80.read_byte(z80.pc++);
         }
     }
 
     template <AddressingMode addressingMode, typename T>
     T read_value() {
-        switch (addressingMode) {
-            case AddressingMode::Immediate:
-                switch (sizeof(T)) {
-                    case sizeof(u16): {
-                        return read_16_pc();
-                    }
-                    case sizeof(u8):
-                        return z80.read_byte(z80.pc++);
+        if (addressingMode == AddressingMode::Immediate) {
+            switch (sizeof(T)) {
+                case sizeof(u16): {
+                    return read_16_pc();
                 }
-                break;
-            case AddressingMode::Indirect: {
-                u16 address = get_address<AddressingMode::Indirect>();
-                if constexpr(std::is_same_v<T, u16>) {
-                    return read_16(address);
-                } else if constexpr(std::is_same_v<T, u8>) {
-                    return z80.read_byte(address);
-                }
+                case sizeof(u8):
+                    return z80.read_byte(z80.pc++);
             }
-            case AddressingMode::HL:
-                if (std::is_same_v<T, u16>) {
-                    return read_16(get_register<Register::HL>());
-                } else if (std::is_same_v<T, u8>) {
-                    return z80.read_byte(get_register<Register::HL>());
-                }
-            case AddressingMode::BC:
-                return read_16(get_register<Register::BC>());
-            case AddressingMode::IXPlus:
-                if (std::is_same_v<T, u16>) {
-                    return read_16(get_register<Register::IX>() + (s8)z80.read_byte(z80.pc++));
-                } else if (std::is_same_v<T, u8>) {
-                    return z80.read_byte(get_register<Register::IX>() + (s8)z80.read_byte(z80.pc++));
-                }
-            case AddressingMode::IYPlus:
-                if (std::is_same_v<T, u16>) {
-                    return read_16(get_register<Register::IY>() + (s8)z80.read_byte(z80.pc++));
-                } else if (std::is_same_v<T, u8>) {
-                    return z80.read_byte(get_register<Register::IY>() + (s8)z80.read_byte(z80.pc++));
-                }
+        } else {
+            u16 address = get_address<addressingMode>();
+            if constexpr(std::is_same_v<T, u16>) {
+                return read_16(address);
+            } else if constexpr(std::is_same_v<T, u8>) {
+                return z80.read_byte(address);
+            }
         }
     }
 
@@ -286,6 +272,14 @@ namespace {
             num_1_bits += (value >> i) & 1;
         }
         return (num_1_bits % 2) == 0;
+    }
+
+    bool vflag(u8 a, u8 b, u8 r) {
+        return ((a & 0x80) == (b & 0x80)) && ((a & 0x80) != (r & 0x80));
+    }
+
+    bool vflag_16(u16 a, u16 b, u16 r) {
+        return ((a & 0x8000) == (b & 0x8000)) && ((a & 0x8000) != (r & 0x8000));
     }
 }
 
@@ -392,6 +386,21 @@ namespace Z80 {
         }
     }
 
+    template <AddressingMode src>
+    int instr_inc() {
+        u8 m = read_value<src, u8>();
+        u8 r = m + 1;
+        z80.f.n = false;
+        z80.f.p_v = m == 0x7F;
+        z80.f.h = (m & 0xF) == 0xF;
+        z80.f.b3 = (r >> 3) & 1;
+        z80.f.b5 = (r >> 5) & 1;
+        z80.f.z = r == 0;
+        z80.f.s = ((s8)r) < 0;
+        write_value<src>(r);
+        return 11;
+    }
+
 
     template <Register dst, Register src>
     int instr_ld() {
@@ -412,10 +421,15 @@ namespace Z80 {
 
     template <AddressingMode dst, Register src, typename srcT = typename reg_type<src>::type>
     int instr_ld() {
-        z80.write_byte(get_address<dst>(), get_register<src>());
+        u16 address = get_address<dst>();
+
         if (sizeof(srcT) == sizeof(u16)) {
+            u16 value = get_register<src>();
+            z80.write_byte(address + 0, value & 0xFF);
+            z80.write_byte(address + 1, (value >> 8) & 0xFF);
             return 16;
         } else {
+            z80.write_byte(address, get_register<src>());
             return 13;
         }
     }
@@ -484,6 +498,48 @@ namespace Z80 {
         return 7;
     }
 
+    template <Register src>
+    int instr_or() {
+        z80.a = z80.a | get_register<src>();
+        z80.f.s = ((s8)z80.a) < 0;
+        z80.f.z = z80.a == 0;
+        z80.f.h = false;
+        z80.f.p_v = parity(z80.a);
+        z80.f.n = false;
+        z80.f.c = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
+        return 7;
+    }
+
+    template <AddressingMode addressingMode>
+    int instr_xor() {
+        z80.a = z80.a ^ read_value<addressingMode, u8>();
+        z80.f.s = ((s8)z80.a) < 0;
+        z80.f.z = z80.a == 0;
+        z80.f.h = false;
+        z80.f.p_v = parity(z80.a);
+        z80.f.n = false;
+        z80.f.c = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
+        return 7;
+    }
+
+    template <Register src>
+    int instr_xor() {
+        z80.a = z80.a ^ get_register<src>();
+        z80.f.s = ((s8)z80.a) < 0;
+        z80.f.z = z80.a == 0;
+        z80.f.h = false;
+        z80.f.p_v = parity(z80.a);
+        z80.f.n = false;
+        z80.f.c = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
+        return 7;
+    }
+
     template <Register dst, Register src>
     int instr_add() {
         if (get_register_size<dst>() == sizeof(u16) && get_register_size<src>() == sizeof(u16)) {
@@ -500,6 +556,68 @@ namespace Z80 {
             return 11;
         }
         logfatal("Should not reach here, or time to implement 8 bit adds");
+    }
+
+    template <Register dst, AddressingMode src>
+    int instr_add() {
+        static_assert(get_register_size<dst>() == sizeof(u8));
+        u16 op1 = get_register<dst>();
+        u16 op2 = read_value<src, u8>();
+        u16 res = op1 + op2;
+        set_register<dst>(res & 0xFF);
+
+        z80.f.h = ((op1 & 0xF) + (op2 & 0xF)) > 0xF; // Carry into bit 4
+        z80.f.n = false;
+        z80.f.c = res > 0xFF;
+        z80.f.b3 = (res >> 3) & 1;
+        z80.f.b5 = (res >> 5) & 1;
+        return 7;
+    }
+
+    template <Register dst, Register src>
+    int instr_adc() {
+        if (get_register_size<dst>() == sizeof(u16) && get_register_size<src>() == sizeof(u16)) {
+            u32 op1 = get_register<dst>();
+            u32 op2 = get_register<src>() + (z80.f.c ? 1 : 0);
+            u32 res = op1 + op2;
+            set_register<dst>(res & 0xFFFF);
+
+            z80.f.z = res == 0;
+            z80.f.s = ((s16)(res & 0xFFFF)) < 0;
+            z80.f.p_v = vflag_16(op1, op2, res);
+            z80.f.h = ((op1 & 0xFFF) + (op2 & 0xFFF)) > 0xFFF; // Carry into bit 12
+            z80.f.n = false;
+            z80.f.c = res > 0xFFFF;
+            z80.f.b3 = (res >> 11) & 1;
+            z80.f.b5 = (res >> 13) & 1;
+            return 11;
+        }
+        logfatal("Should not reach here, or time to implement 8 bit adds");
+    }
+
+    template <Register dst, Register src, typename dstT = typename reg_type<dst>::type, typename srcT = typename reg_type<src>::type>
+    int instr_sbc() {
+        static_assert(std::is_same_v<dstT, srcT>, "SBC only valid when dst and src are the same size");
+
+        if (std::is_same_v<dstT, u16>) {
+            u16 minuend = get_register<dst>();
+            u32 subtrahend = get_register<src>() + (z80.f.c ? 1 : 0);
+            u16 result = minuend - subtrahend;
+            set_register<dst>(result);
+            z80.f.c = subtrahend > minuend;
+            z80.f.n = true;
+            z80.f.p_v = vflag_16(minuend, ~subtrahend + 1, result);
+            z80.f.h = (minuend & 0xFFF) < (subtrahend & 0xFFF);
+            z80.f.b3 = (result >> 11) & 1;
+            z80.f.b5 = (result >> 13) & 1;
+            z80.f.z = result == 0;
+            z80.f.s = ((s16)result) < 0;
+
+            return 15;
+        } else if (std::is_same_v<dstT, u8>) {
+            logfatal("Implement me");
+            return 4;
+        }
     }
 
     template <Register src, typename T = typename reg_type<src>::type>
@@ -529,10 +647,6 @@ namespace Z80 {
         z80.f.b3 = (z80.a >> 3) & 1;
         z80.f.b5 = (z80.a >> 5) & 1;
         return 4;
-    }
-
-    bool vflag(u8 a, u8 b, u8 r) {
-        return ((a & 0x80) == (b & 0x80)) && ((a & 0x80) != (r & 0x80));
     }
 
     template <AddressingMode addressingMode>
@@ -661,6 +775,11 @@ namespace Z80 {
         return 4;
     }
 
+    int instr_ei() {
+        // stubbed for now
+        return 4;
+    }
+
     const instruction instructions[0x100] = {
             /* 00 */ instr_nop,
             /* 01 */ instr_ld<Register::BC, AddressingMode::Immediate>,
@@ -680,7 +799,7 @@ namespace Z80 {
             /* 0F */ instr_rrca,
             /* 10 */ instr_djnz,
             /* 11 */ instr_ld<Register::DE, AddressingMode::Immediate>,
-            /* 12 */ unimplemented_instr<0x12>,
+            /* 12 */ instr_ld<AddressingMode::DE, Register::A>,
             /* 13 */ instr_inc<Register::DE>,
             /* 14 */ instr_inc<Register::D>,
             /* 15 */ unimplemented_instr<0x15>,
@@ -688,7 +807,7 @@ namespace Z80 {
             /* 17 */ unimplemented_instr<0x17>,
             /* 18 */ instr_jr<Condition::Always>,
             /* 19 */ instr_add<Register::HL, Register::DE>,
-            /* 1A */ unimplemented_instr<0x1A>,
+            /* 1A */ instr_ld<Register::A, AddressingMode::DE>,
             /* 1B */ unimplemented_instr<0x1B>,
             /* 1C */ unimplemented_instr<0x1C>,
             /* 1D */ instr_dec<Register::E>,
@@ -696,14 +815,14 @@ namespace Z80 {
             /* 1F */ unimplemented_instr<0x1F>,
             /* 20 */ instr_jr<Condition::NZ>,
             /* 21 */ instr_ld<Register::HL, AddressingMode::Immediate>,
-            /* 22 */ unimplemented_instr<0x22>,
+            /* 22 */ instr_ld<AddressingMode::Indirect, Register::HL>,
             /* 23 */ instr_inc<Register::HL>,
             /* 24 */ unimplemented_instr<0x24>,
             /* 25 */ unimplemented_instr<0x25>,
             /* 26 */ instr_ld<Register::H, AddressingMode::Immediate>,
             /* 27 */ unimplemented_instr<0x27>,
             /* 28 */ instr_jr<Condition::Z>,
-            /* 29 */ unimplemented_instr<0x29>,
+            /* 29 */ instr_add<Register::HL, Register::HL>,
             /* 2A */ instr_ld<Register::HL, AddressingMode::Indirect>,
             /* 2B */ instr_dec<Register::HL>,
             /* 2C */ unimplemented_instr<0x2C>,
@@ -714,12 +833,12 @@ namespace Z80 {
             /* 31 */ instr_ld<Register::SP, AddressingMode::Immediate>,
             /* 32 */ instr_ld<AddressingMode::Indirect, Register::A>,
             /* 33 */ unimplemented_instr<0x33>,
-            /* 34 */ unimplemented_instr<0x34>,
+            /* 34 */ instr_inc<AddressingMode::HL>,
             /* 35 */ unimplemented_instr<0x35>,
             /* 36 */ instr_ld<AddressingMode::HL, AddressingMode::Immediate>,
             /* 37 */ unimplemented_instr<0x37>,
             /* 38 */ instr_jr<Condition::C>,
-            /* 39 */ unimplemented_instr<0x39>,
+            /* 39 */ instr_add<Register::HL, Register::SP>,
             /* 3A */ instr_ld<Register::A, AddressingMode::Indirect>,
             /* 3B */ unimplemented_instr<0x3B>,
             /* 3C */ instr_inc<Register::A>,
@@ -727,20 +846,20 @@ namespace Z80 {
             /* 3E */ instr_ld<Register::A, AddressingMode::Immediate>,
             /* 3F */ unimplemented_instr<0x3F>,
             /* 40 */ instr_ld<Register::B, Register::B>,
-            /* 41 */ unimplemented_instr<0x41>,
-            /* 42 */ unimplemented_instr<0x42>,
-            /* 43 */ unimplemented_instr<0x43>,
-            /* 44 */ unimplemented_instr<0x44>,
-            /* 45 */ unimplemented_instr<0x45>,
-            /* 46 */ unimplemented_instr<0x46>,
+            /* 41 */ instr_ld<Register::B, Register::C>,
+            /* 42 */ instr_ld<Register::B, Register::D>,
+            /* 43 */ instr_ld<Register::B, Register::E>,
+            /* 44 */ instr_ld<Register::B, Register::H>,
+            /* 45 */ instr_ld<Register::B, Register::L>,
+            /* 46 */ instr_ld<Register::B, AddressingMode::HL>,
             /* 47 */ instr_ld<Register::B, Register::A>,
-            /* 48 */ unimplemented_instr<0x48>,
-            /* 49 */ unimplemented_instr<0x49>,
-            /* 4A */ unimplemented_instr<0x4A>,
-            /* 4B */ unimplemented_instr<0x4B>,
-            /* 4C */ unimplemented_instr<0x4C>,
-            /* 4D */ unimplemented_instr<0x4D>,
-            /* 4E */ unimplemented_instr<0x4E>,
+            /* 48 */ instr_ld<Register::C, Register::B>,
+            /* 49 */ instr_ld<Register::C, Register::C>,
+            /* 4A */ instr_ld<Register::C, Register::D>,
+            /* 4B */ instr_ld<Register::C, Register::E>,
+            /* 4C */ instr_ld<Register::C, Register::H>,
+            /* 4D */ instr_ld<Register::C, Register::L>,
+            /* 4E */ instr_ld<Register::C, AddressingMode::HL>,
             /* 4F */ instr_ld<Register::C, Register::A>,
             /* 50 */ unimplemented_instr<0x50>,
             /* 51 */ unimplemented_instr<0x51>,
@@ -757,7 +876,7 @@ namespace Z80 {
             /* 5C */ unimplemented_instr<0x5C>,
             /* 5D */ instr_ld<Register::E, Register::L>,
             /* 5E */ instr_ld<Register::E, AddressingMode::HL>,
-            /* 5F */ unimplemented_instr<0x5F>,
+            /* 5F */ instr_ld<Register::E, Register::A>,
             /* 60 */ unimplemented_instr<0x60>,
             /* 61 */ unimplemented_instr<0x61>,
             /* 62 */ instr_ld<Register::H, Register::D>,
@@ -822,22 +941,22 @@ namespace Z80 {
             /* 9D */ unimplemented_instr<0x9D>,
             /* 9E */ unimplemented_instr<0x9E>,
             /* 9F */ unimplemented_instr<0x9F>,
-            /* A0 */ unimplemented_instr<0xA0>,
+            /* A0 */ instr_and<Register::B>,
             /* A1 */ instr_and<Register::C>,
-            /* A2 */ unimplemented_instr<0xA2>,
-            /* A3 */ unimplemented_instr<0xA3>,
-            /* A4 */ unimplemented_instr<0xA4>,
-            /* A5 */ unimplemented_instr<0xA5>,
-            /* A6 */ unimplemented_instr<0xA6>,
-            /* A7 */ unimplemented_instr<0xA7>,
-            /* A8 */ unimplemented_instr<0xA8>,
-            /* A9 */ unimplemented_instr<0xA9>,
-            /* AA */ unimplemented_instr<0xAA>,
-            /* AB */ unimplemented_instr<0xAB>,
-            /* AC */ unimplemented_instr<0xAC>,
-            /* AD */ unimplemented_instr<0xAD>,
-            /* AE */ unimplemented_instr<0xAE>,
-            /* AF */ unimplemented_instr<0xAF>,
+            /* A2 */ instr_and<Register::D>,
+            /* A3 */ instr_and<Register::E>,
+            /* A4 */ instr_and<Register::H>,
+            /* A5 */ instr_and<Register::L>,
+            /* A6 */ instr_and<AddressingMode::HL>,
+            /* A7 */ instr_and<Register::A>,
+            /* A8 */ instr_xor<Register::B>,
+            /* A9 */ instr_xor<Register::C>,
+            /* AA */ instr_xor<Register::D>,
+            /* AB */ instr_xor<Register::E>,
+            /* AC */ instr_xor<Register::H>,
+            /* AD */ instr_xor<Register::L>,
+            /* AE */ instr_xor<AddressingMode::HL>,
+            /* AF */ instr_xor<Register::A>,
             /* B0 */ unimplemented_instr<0xB0>,
             /* B1 */ unimplemented_instr<0xB1>,
             /* B2 */ unimplemented_instr<0xB2>,
@@ -845,14 +964,14 @@ namespace Z80 {
             /* B4 */ unimplemented_instr<0xB4>,
             /* B5 */ unimplemented_instr<0xB5>,
             /* B6 */ instr_or<AddressingMode::HL>,
-            /* B7 */ unimplemented_instr<0xB7>,
+            /* B7 */ instr_or<Register::A>,
             /* B8 */ unimplemented_instr<0xB8>,
             /* B9 */ unimplemented_instr<0xB9>,
             /* BA */ unimplemented_instr<0xBA>,
             /* BB */ unimplemented_instr<0xBB>,
             /* BC */ unimplemented_instr<0xBC>,
             /* BD */ unimplemented_instr<0xBD>,
-            /* BE */ unimplemented_instr<0xBE>,
+            /* BE */ instr_cp<AddressingMode::HL>,
             /* BF */ unimplemented_instr<0xBF>,
             /* C0 */ instr_ret<Condition::NZ>,
             /* C1 */ instr_pop<Register::BC>,
@@ -860,7 +979,7 @@ namespace Z80 {
             /* C3 */ instr_jp<Condition::Always, AddressingMode::Indirect>,
             /* C4 */ instr_call<Condition::NZ>,
             /* C5 */ instr_push<Register::BC>,
-            /* C6 */ unimplemented_instr<0xC6>,
+            /* C6 */ instr_add<Register::A, AddressingMode::Immediate>,
             /* C7 */ unimplemented_instr<0xC7>,
             /* C8 */ instr_ret<Condition::Z>,
             /* C9 */ instr_ret<Condition::Always>,
@@ -913,7 +1032,7 @@ namespace Z80 {
             /* F8 */ instr_ret<Condition::M>,
             /* F9 */ instr_ld<Register::SP, Register::HL>,
             /* FA */ instr_jp<Condition::M, AddressingMode::Indirect>,
-            /* FB */ unimplemented_instr<0xFB>,
+            /* FB */ instr_ei,
             /* FC */ instr_call<Condition::M>,
             /* FD */ instr_fd,
             /* FE */ instr_cp<AddressingMode::Immediate>,
@@ -930,7 +1049,7 @@ namespace Z80 {
             /* DD 06 */ unimplemented_dd_instr<0x06>,
             /* DD 07 */ unimplemented_dd_instr<0x07>,
             /* DD 08 */ unimplemented_dd_instr<0x08>,
-            /* DD 09 */ unimplemented_dd_instr<0x09>,
+            /* DD 09 */ instr_add<Register::IX, Register::BC>,
             /* DD 0A */ unimplemented_dd_instr<0x0A>,
             /* DD 0B */ unimplemented_dd_instr<0x0B>,
             /* DD 0C */ unimplemented_dd_instr<0x0C>,
@@ -946,7 +1065,7 @@ namespace Z80 {
             /* DD 16 */ unimplemented_dd_instr<0x16>,
             /* DD 17 */ unimplemented_dd_instr<0x17>,
             /* DD 18 */ unimplemented_dd_instr<0x18>,
-            /* DD 19 */ unimplemented_dd_instr<0x19>,
+            /* DD 19 */ instr_add<Register::IX, Register::DE>,
             /* DD 1A */ unimplemented_dd_instr<0x1A>,
             /* DD 1B */ unimplemented_dd_instr<0x1B>,
             /* DD 1C */ unimplemented_dd_instr<0x1C>,
@@ -962,7 +1081,7 @@ namespace Z80 {
             /* DD 26 */ unimplemented_dd_instr<0x26>,
             /* DD 27 */ unimplemented_dd_instr<0x27>,
             /* DD 28 */ unimplemented_dd_instr<0x28>,
-            /* DD 29 */ unimplemented_dd_instr<0x29>,
+            /* DD 29 */ instr_add<Register::IX, Register::IX>,
             /* DD 2A */ unimplemented_dd_instr<0x2A>,
             /* DD 2B */ unimplemented_dd_instr<0x2B>,
             /* DD 2C */ unimplemented_dd_instr<0x2C>,
@@ -978,7 +1097,7 @@ namespace Z80 {
             /* DD 36 */ unimplemented_dd_instr<0x36>,
             /* DD 37 */ unimplemented_dd_instr<0x37>,
             /* DD 38 */ unimplemented_dd_instr<0x38>,
-            /* DD 39 */ unimplemented_dd_instr<0x39>,
+            /* DD 39 */ instr_add<Register::IX, Register::SP>,
             /* DD 3A */ unimplemented_dd_instr<0x3A>,
             /* DD 3B */ unimplemented_dd_instr<0x3B>,
             /* DD 3C */ unimplemented_dd_instr<0x3C>,
@@ -1246,7 +1365,7 @@ namespace Z80 {
             /* ED 3F */ unimplemented_ed_instr<0x3F>,
             /* ED 40 */ unimplemented_ed_instr<0x40>,
             /* ED 41 */ unimplemented_ed_instr<0x41>,
-            /* ED 42 */ unimplemented_ed_instr<0x42>,
+            /* ED 42 */ instr_sbc<Register::HL, Register::BC>,
             /* ED 43 */ unimplemented_ed_instr<0x43>,
             /* ED 44 */ unimplemented_ed_instr<0x44>,
             /* ED 45 */ unimplemented_ed_instr<0x45>,
@@ -1254,7 +1373,7 @@ namespace Z80 {
             /* ED 47 */ unimplemented_ed_instr<0x47>,
             /* ED 48 */ unimplemented_ed_instr<0x48>,
             /* ED 49 */ unimplemented_ed_instr<0x49>,
-            /* ED 4A */ unimplemented_ed_instr<0x4A>,
+            /* ED 4A */ instr_adc<Register::HL, Register::BC>,
             /* ED 4B */ unimplemented_ed_instr<0x4B>,
             /* ED 4C */ unimplemented_ed_instr<0x4C>,
             /* ED 4D */ unimplemented_ed_instr<0x4D>,
@@ -1262,7 +1381,7 @@ namespace Z80 {
             /* ED 4F */ unimplemented_ed_instr<0x4F>,
             /* ED 50 */ unimplemented_ed_instr<0x50>,
             /* ED 51 */ unimplemented_ed_instr<0x51>,
-            /* ED 52 */ unimplemented_ed_instr<0x52>,
+            /* ED 52 */ instr_sbc<Register::HL, Register::DE>,
             /* ED 53 */ unimplemented_ed_instr<0x53>,
             /* ED 54 */ unimplemented_ed_instr<0x54>,
             /* ED 55 */ unimplemented_ed_instr<0x55>,
@@ -1270,7 +1389,7 @@ namespace Z80 {
             /* ED 57 */ unimplemented_ed_instr<0x57>,
             /* ED 58 */ unimplemented_ed_instr<0x58>,
             /* ED 59 */ unimplemented_ed_instr<0x59>,
-            /* ED 5A */ unimplemented_ed_instr<0x5A>,
+            /* ED 5A */ instr_adc<Register::HL, Register::DE>,
             /* ED 5B */ unimplemented_ed_instr<0x5B>,
             /* ED 5C */ unimplemented_ed_instr<0x5C>,
             /* ED 5D */ unimplemented_ed_instr<0x5D>,
@@ -1278,7 +1397,7 @@ namespace Z80 {
             /* ED 5F */ unimplemented_ed_instr<0x5F>,
             /* ED 60 */ unimplemented_ed_instr<0x60>,
             /* ED 61 */ unimplemented_ed_instr<0x61>,
-            /* ED 62 */ unimplemented_ed_instr<0x62>,
+            /* ED 62 */ instr_sbc<Register::HL, Register::HL>,
             /* ED 63 */ unimplemented_ed_instr<0x63>,
             /* ED 64 */ unimplemented_ed_instr<0x64>,
             /* ED 65 */ unimplemented_ed_instr<0x65>,
@@ -1286,7 +1405,7 @@ namespace Z80 {
             /* ED 67 */ unimplemented_ed_instr<0x67>,
             /* ED 68 */ unimplemented_ed_instr<0x68>,
             /* ED 69 */ unimplemented_ed_instr<0x69>,
-            /* ED 6A */ unimplemented_ed_instr<0x6A>,
+            /* ED 6A */ instr_adc<Register::HL, Register::HL>,
             /* ED 6B */ unimplemented_ed_instr<0x6B>,
             /* ED 6C */ unimplemented_ed_instr<0x6C>,
             /* ED 6D */ unimplemented_ed_instr<0x6D>,
@@ -1294,7 +1413,7 @@ namespace Z80 {
             /* ED 6F */ unimplemented_ed_instr<0x6F>,
             /* ED 70 */ unimplemented_ed_instr<0x70>,
             /* ED 71 */ unimplemented_ed_instr<0x71>,
-            /* ED 72 */ unimplemented_ed_instr<0x72>,
+            /* ED 72 */ instr_sbc<Register::HL, Register::SP>,
             /* ED 73 */ instr_ld<AddressingMode::Indirect, Register::SP>,
             /* ED 74 */ unimplemented_ed_instr<0x74>,
             /* ED 75 */ unimplemented_ed_instr<0x75>,
@@ -1302,7 +1421,7 @@ namespace Z80 {
             /* ED 77 */ unimplemented_ed_instr<0x77>,
             /* ED 78 */ unimplemented_ed_instr<0x78>,
             /* ED 79 */ unimplemented_ed_instr<0x79>,
-            /* ED 7A */ unimplemented_ed_instr<0x7A>,
+            /* ED 7A */ instr_adc<Register::HL, Register::SP>,
             /* ED 7B */ instr_ld<Register::SP, AddressingMode::Indirect>,
             /* ED 7C */ unimplemented_ed_instr<0x7C>,
             /* ED 7D */ unimplemented_ed_instr<0x7D>,
@@ -1384,7 +1503,7 @@ namespace Z80 {
             /* FD 06 */ unimplemented_fd_instr<0x06>,
             /* FD 07 */ unimplemented_fd_instr<0x07>,
             /* FD 08 */ unimplemented_fd_instr<0x08>,
-            /* FD 09 */ unimplemented_fd_instr<0x09>,
+            /* FD 09 */ instr_add<Register::IY, Register::BC>,
             /* FD 0A */ unimplemented_fd_instr<0x0A>,
             /* FD 0B */ unimplemented_fd_instr<0x0B>,
             /* FD 0C */ unimplemented_fd_instr<0x0C>,
@@ -1400,7 +1519,7 @@ namespace Z80 {
             /* FD 16 */ unimplemented_fd_instr<0x16>,
             /* FD 17 */ unimplemented_fd_instr<0x17>,
             /* FD 18 */ unimplemented_fd_instr<0x18>,
-            /* FD 19 */ unimplemented_fd_instr<0x19>,
+            /* FD 19 */ instr_add<Register::IY, Register::DE>,
             /* FD 1A */ unimplemented_fd_instr<0x1A>,
             /* FD 1B */ unimplemented_fd_instr<0x1B>,
             /* FD 1C */ unimplemented_fd_instr<0x1C>,
@@ -1416,7 +1535,7 @@ namespace Z80 {
             /* FD 26 */ unimplemented_fd_instr<0x26>,
             /* FD 27 */ unimplemented_fd_instr<0x27>,
             /* FD 28 */ unimplemented_fd_instr<0x28>,
-            /* FD 29 */ unimplemented_fd_instr<0x29>,
+            /* FD 29 */ instr_add<Register::IY, Register::IY>,
             /* FD 2A */ unimplemented_fd_instr<0x2A>,
             /* FD 2B */ unimplemented_fd_instr<0x2B>,
             /* FD 2C */ unimplemented_fd_instr<0x2C>,
@@ -1432,7 +1551,7 @@ namespace Z80 {
             /* FD 36 */ unimplemented_fd_instr<0x36>,
             /* FD 37 */ unimplemented_fd_instr<0x37>,
             /* FD 38 */ unimplemented_fd_instr<0x38>,
-            /* FD 39 */ unimplemented_fd_instr<0x39>,
+            /* FD 39 */ instr_add<Register::IY, Register::SP>,
             /* FD 3A */ unimplemented_fd_instr<0x3A>,
             /* FD 3B */ unimplemented_fd_instr<0x3B>,
             /* FD 3C */ unimplemented_fd_instr<0x3C>,

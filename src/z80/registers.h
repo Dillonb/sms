@@ -102,7 +102,7 @@ namespace Z80 {
     template<> struct reg_type<Register::SP> { using type = u16; };
 
     template <Register reg>
-    int get_register_size() {
+    constexpr int get_register_size() {
         switch (reg) {
             case Register::A:
             case Register::B:
@@ -116,6 +116,8 @@ namespace Z80 {
             case Register::DE:
             case Register::HL:
             case Register::SP:
+            case Register::IX:
+            case Register::IY:
                 return sizeof(u16);
         }
     }

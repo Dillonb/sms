@@ -30,7 +30,13 @@ void load_rom(const char* path) {
 bool check(const char* field, const std::string& expected, const u16 actual) {
     u16 expected_int = std::stoi(expected, nullptr, 16);
     if (actual != expected_int) {
-        printf("%s Expected: %s Actual: %04X\n", field, expected.c_str(), actual);
+        if (expected.length() == 4) {
+            printf("%s Expected: %s Actual: %04X\n", field, expected.c_str(), actual);
+        } else if (expected.length() == 2) {
+            printf("%s Expected: %s Actual: %02X\n", field, expected.c_str(), actual);
+        } else {
+            printf("%s Expected: %s Actual: %X\n", field, expected.c_str(), actual);
+        }
         if ("AF" == std::string(field)) {
             printf("       SZ5H3P/VNC\n");
             Z80::FlagRegister expected_f;
@@ -59,6 +65,10 @@ void check_log(std::string& line) {
     any_bad |= check("IX", line.substr(64, 4), Z80::z80.ix);
     any_bad |= check("IY", line.substr(74, 4), Z80::z80.iy);
     any_bad |= check("I",  line.substr(83, 2), Z80::z80.i);
+    any_bad |= check("PC+0", line.substr(94, 2), Z80::z80.read_byte(Z80::z80.pc + 0));
+    any_bad |= check("PC+1", line.substr(97, 2), Z80::z80.read_byte(Z80::z80.pc + 1));
+    any_bad |= check("PC+2", line.substr(100, 2), Z80::z80.read_byte(Z80::z80.pc + 2));
+    any_bad |= check("PC+3", line.substr(103, 2), Z80::z80.read_byte(Z80::z80.pc + 3));
 
     if (any_bad) {
         exit(1);

@@ -332,8 +332,8 @@ namespace Z80 {
 
     template <Condition c>
     int instr_jr() {
+        s8 offset = z80.read_byte(z80.pc++);
         if (check_condition<c>()) {
-            s8 offset = z80.read_byte(z80.pc++);
             z80.pc += offset;
             return 12;
         }
@@ -353,6 +353,8 @@ namespace Z80 {
                 z80.f.h = (r & 0xF) > (m & 0xF); // overflow on lower half of reg
                 z80.f.p_v = m == 0x80;
                 z80.f.n = true;
+                z80.f.b3 = (r >> 3) & 1;
+                z80.f.b5 = (r >> 5) & 1;
 
                 return 4;
             }
@@ -434,7 +436,7 @@ namespace Z80 {
         if (check_condition<c>()) {
             // Push return address
             stack_push<u16>(z80.pc);
-            logwarn("Calling function at %04X - return address is %04X", address, z80.pc);
+            logtrace("Calling function at %04X - return address is %04X", address, z80.pc);
             z80.pc = address;
             return 17;
         }
@@ -446,7 +448,7 @@ namespace Z80 {
         if (check_condition<c>()) {
             // Push return address
             z80.pc = stack_pop<u16>();
-            logwarn("Returning to address %04X", z80.pc);
+            logtrace("Returning to address %04X", z80.pc);
             if (c == Condition::Always) {
                 return 10;
             } else {
@@ -493,6 +495,8 @@ namespace Z80 {
             z80.f.h = ((op1 & 0xFFF) + (op2 & 0xFFF)) > 0xFFF; // Carry into bit 12
             z80.f.n = false;
             z80.f.c = res > 0xFFFF;
+            z80.f.b3 = (res >> 11) & 1;
+            z80.f.b5 = (res >> 13) & 1;
             return 11;
         }
         logfatal("Should not reach here, or time to implement 8 bit adds");
@@ -652,6 +656,11 @@ namespace Z80 {
         return 8;
     }
 
+    int instr_di() {
+        // stubbed for now
+        return 4;
+    }
+
     const instruction instructions[0x100] = {
             /* 00 */ instr_nop,
             /* 01 */ instr_ld<Register::BC, AddressingMode::Immediate>,
@@ -691,7 +700,7 @@ namespace Z80 {
             /* 23 */ instr_inc<Register::HL>,
             /* 24 */ unimplemented_instr<0x24>,
             /* 25 */ unimplemented_instr<0x25>,
-            /* 26 */ unimplemented_instr<0x26>,
+            /* 26 */ instr_ld<Register::H, AddressingMode::Immediate>,
             /* 27 */ unimplemented_instr<0x27>,
             /* 28 */ instr_jr<Condition::Z>,
             /* 29 */ unimplemented_instr<0x29>,
@@ -724,7 +733,7 @@ namespace Z80 {
             /* 44 */ unimplemented_instr<0x44>,
             /* 45 */ unimplemented_instr<0x45>,
             /* 46 */ unimplemented_instr<0x46>,
-            /* 47 */ unimplemented_instr<0x47>,
+            /* 47 */ instr_ld<Register::B, Register::A>,
             /* 48 */ unimplemented_instr<0x48>,
             /* 49 */ unimplemented_instr<0x49>,
             /* 4A */ unimplemented_instr<0x4A>,
@@ -896,7 +905,7 @@ namespace Z80 {
             /* F0 */ instr_ret<Condition::P>,
             /* F1 */ instr_pop<Register::AF>,
             /* F2 */ instr_jp<Condition::P, AddressingMode::Indirect>,
-            /* F3 */ unimplemented_instr<0xF3>,
+            /* F3 */ instr_di,
             /* F4 */ instr_call<Condition::P>,
             /* F5 */ instr_push<Register::AF>,
             /* F6 */ unimplemented_instr<0xF6>,
@@ -1286,7 +1295,7 @@ namespace Z80 {
             /* ED 70 */ unimplemented_ed_instr<0x70>,
             /* ED 71 */ unimplemented_ed_instr<0x71>,
             /* ED 72 */ unimplemented_ed_instr<0x72>,
-            /* ED 73 */ unimplemented_ed_instr<0x73>,
+            /* ED 73 */ instr_ld<AddressingMode::Indirect, Register::SP>,
             /* ED 74 */ unimplemented_ed_instr<0x74>,
             /* ED 75 */ unimplemented_ed_instr<0x75>,
             /* ED 76 */ unimplemented_ed_instr<0x76>,
@@ -1294,7 +1303,7 @@ namespace Z80 {
             /* ED 78 */ unimplemented_ed_instr<0x78>,
             /* ED 79 */ unimplemented_ed_instr<0x79>,
             /* ED 7A */ unimplemented_ed_instr<0x7A>,
-            /* ED 7B */ unimplemented_ed_instr<0x7B>,
+            /* ED 7B */ instr_ld<Register::SP, AddressingMode::Indirect>,
             /* ED 7C */ unimplemented_ed_instr<0x7C>,
             /* ED 7D */ unimplemented_ed_instr<0x7D>,
             /* ED 7E */ unimplemented_ed_instr<0x7E>,

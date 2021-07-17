@@ -890,9 +890,32 @@ namespace Z80 {
         return 4;
     }
 
+    int instr_cpd() {
+        logfatal("bleh");
+    }
+
     int instr_out() {
         z80.port_out(z80.read_byte(z80.pc++), z80.a);
         return 4;
+    }
+
+    int instr_otir() {
+        u8 b = read_value<AddressingMode::HL, u8>();
+        u8 port = get_register<Register::C>();
+        logalways("About to write %02X to port %02X", b, port);
+        z80.port_out(port, b);
+
+        z80.hl.raw++;
+        u8 reg_b = get_register<Register::B>() - 1;
+        set_register<Register::B>(reg_b);
+
+        int cycles = 16;
+
+        if (b != 0) {
+            z80.pc -= 2; // repeat
+            cycles += 5;
+        }
+        return cycles;
     }
 
     int instr_cb() {
@@ -1197,6 +1220,10 @@ namespace Z80 {
         logfatal("instr_set");
     }
 
+    int instr_im_1() {
+        Z80::z80.interrupt_mode = 1;
+        return 8;
+    }
 
     const instruction instructions[0x100] = {
             /* 00 */ instr_nop,
@@ -1226,7 +1253,7 @@ namespace Z80 {
             /* 18 */ instr_jr<Condition::Always>,
             /* 19 */ instr_add<Register::HL, Register::DE>,
             /* 1A */ instr_ld<Register::A, AddressingMode::DE>,
-            /* 1B */ unimplemented_instr<0x1B>,
+            /* 1B */ instr_dec<Register::DE>,
             /* 1C */ unimplemented_instr<0x1C>,
             /* 1D */ instr_dec<Register::E>,
             /* 1E */ unimplemented_instr<0x1E>,
@@ -2321,7 +2348,7 @@ namespace Z80 {
             /* ED 53 */ unimplemented_ed_instr<0x53>,
             /* ED 54 */ unimplemented_ed_instr<0x54>,
             /* ED 55 */ unimplemented_ed_instr<0x55>,
-            /* ED 56 */ unimplemented_ed_instr<0x56>,
+            /* ED 56 */ instr_im_1,
             /* ED 57 */ unimplemented_ed_instr<0x57>,
             /* ED 58 */ unimplemented_ed_instr<0x58>,
             /* ED 59 */ unimplemented_ed_instr<0x59>,
@@ -2404,7 +2431,7 @@ namespace Z80 {
             /* ED A6 */ unimplemented_ed_instr<0xA6>,
             /* ED A7 */ unimplemented_ed_instr<0xA7>,
             /* ED A8 */ unimplemented_ed_instr<0xA8>,
-            /* ED A9 */ unimplemented_ed_instr<0xA9>,
+            /* ED A9 */ instr_cpd,
             /* ED AA */ unimplemented_ed_instr<0xAA>,
             /* ED AB */ unimplemented_ed_instr<0xAB>,
             /* ED AC */ unimplemented_ed_instr<0xAC>,
@@ -2414,7 +2441,7 @@ namespace Z80 {
             /* ED B0 */ instr_ldir,
             /* ED B1 */ unimplemented_ed_instr<0xB1>,
             /* ED B2 */ unimplemented_ed_instr<0xB2>,
-            /* ED B3 */ unimplemented_ed_instr<0xB3>,
+            /* ED B3 */ instr_otir,
             /* ED B4 */ unimplemented_ed_instr<0xB4>,
             /* ED B5 */ unimplemented_ed_instr<0xB5>,
             /* ED B6 */ unimplemented_ed_instr<0xB6>,

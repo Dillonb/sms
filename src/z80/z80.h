@@ -20,6 +20,8 @@ namespace Z80 {
         port_in_handler port_in;
         port_out_handler port_out;
 
+        int interrupt_mode;
+
         u8 a;
         FlagRegister f;
 

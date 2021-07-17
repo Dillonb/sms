@@ -34,6 +34,9 @@ namespace Z80 {
 
         // Shadow registers
         u16 af_, bc_, de_, hl_;
+
+        // for DDCB and FDCB
+        s8 prev_immediate;
     } z80_t;
 
     extern z80_t z80;

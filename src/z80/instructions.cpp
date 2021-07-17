@@ -32,8 +32,10 @@ namespace {
         DE,
         IX,
         IXPlus,
+        IXPlusPrevious,
         IY,
-        IYPlus
+        IYPlus,
+        IYPlusPrevious
     };
 
     u16 read_16(u16 address) {
@@ -232,8 +234,12 @@ namespace {
                 return z80.iy.raw;
             case AddressingMode::IXPlus:
                 return get_register<Register::IX>() + (s8)z80.read_byte(z80.pc++);
+            case AddressingMode::IXPlusPrevious:
+                return get_register<Register::IX>() + z80.prev_immediate;
             case AddressingMode::IYPlus:
                 return get_register<Register::IY>() + (s8)z80.read_byte(z80.pc++);
+            case AddressingMode::IYPlusPrevious:
+                return get_register<Register::IY>() + z80.prev_immediate;
         }
     }
 
@@ -385,6 +391,23 @@ namespace Z80 {
                 return 6;
             }
         }
+    }
+
+    template <AddressingMode src>
+    int instr_dec() {
+        u8 m = read_value<src, u8>();
+        u8 r = m - 1;
+        write_value<src, u8>(r);
+
+        z80.f.s = ((s8)r) < 0;
+        z80.f.z = r == 0;
+        z80.f.h = (r & 0xF) > (m & 0xF); // overflow on lower half of reg
+        z80.f.p_v = m == 0x80;
+        z80.f.n = true;
+        z80.f.b3 = (r >> 3) & 1;
+        z80.f.b5 = (r >> 5) & 1;
+
+        return 4;
     }
 
     template <Register reg, typename T = typename reg_type<reg>::type>
@@ -872,8 +895,17 @@ namespace Z80 {
         return 4;
     }
 
+    int instr_cb() {
+        return cb_instructions[z80.read_byte(z80.pc++)]();
+    }
+
     int instr_dd() {
         return dd_instructions[z80.read_byte(z80.pc++)]();
+    }
+
+    int instr_ddcb() {
+        z80.prev_immediate = z80.read_byte(z80.pc++);
+        return ddcb_instructions[z80.read_byte(z80.pc++)]();
     }
 
     int instr_ed() {
@@ -882,6 +914,11 @@ namespace Z80 {
 
     int instr_fd() {
         return fd_instructions[z80.read_byte(z80.pc++)]();
+    }
+
+    int instr_fdcb() {
+        z80.prev_immediate = z80.read_byte(z80.pc++);
+        return fdcb_instructions[z80.read_byte(z80.pc++)]();
     }
 
     int instr_nop() {
@@ -956,6 +993,210 @@ namespace Z80 {
         // stubbed for now
         return 4;
     }
+
+    template<AddressingMode src, Register dst>
+    int instr_rlc() {
+        u8 value = read_value<src, u8>();
+        u8 res = std::rotl(value, 1);
+
+        set_register<dst>(res);
+        write_value<src>(res);
+        z80.f.s = res & 1;
+        z80.f.z = res == 0;
+        z80.f.p_v = parity(res);
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.c = res & 1;
+        z80.f.b3 = (res >> 3) & 1;
+        z80.f.b5 = (res >> 5) & 1;
+        return 23;
+    }
+
+    template<Register src>
+    int instr_rlc() {
+        u8 value = get_register<src>();
+        u8 res = std::rotl(value, 1);
+        set_register<src>(res);
+        z80.f.s = res & 1;
+        z80.f.z = res == 0;
+        z80.f.p_v = parity(res);
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.c = res & 1;
+        z80.f.b3 = (res >> 3) & 1;
+        z80.f.b5 = (res >> 5) & 1;
+        return 8;
+    }
+
+    template<AddressingMode src>
+    int instr_rlc() {
+        logfatal("rlc");
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_rrc() {
+        logfatal("rrc");
+    }
+
+    template<AddressingMode src>
+    int instr_rrc() {
+        logfatal("rrc");
+    }
+
+    template<Register src>
+    int instr_rrc() {
+        logfatal("rrc");
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_rl() {
+        logfatal("rl");
+    }
+
+    template<AddressingMode src>
+    int instr_rl() {
+        logfatal("rl");
+    }
+
+    template<Register src>
+    int instr_rl() {
+        logfatal("rl");
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_rr() {
+        logfatal("rr");
+    }
+
+    template<AddressingMode src>
+    int instr_rr() {
+        logfatal("rr");
+    }
+
+    template<Register src>
+    int instr_rr() {
+        logfatal("rr");
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_sla() {
+        logfatal("instr_sla");
+    }
+
+    template<AddressingMode src>
+    int instr_sla() {
+        logfatal("instr_sla");
+    }
+
+    template<Register src>
+    int instr_sla() {
+        logfatal("instr_sla");
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_sra() {
+        logfatal("instr_sra");
+    }
+
+    template<AddressingMode src>
+    int instr_sra() {
+        logfatal("instr_sra");
+    }
+
+    template<Register src>
+    int instr_sra() {
+        logfatal("instr_sra");
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_sll() {
+        logfatal("instr_sll");
+    }
+
+    template<AddressingMode src>
+    int instr_sll() {
+        logfatal("instr_sll");
+    }
+
+    template<Register src>
+    int instr_sll() {
+        logfatal("instr_sll");
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_srl() {
+        logfatal("instr_srl");
+    }
+
+    template<AddressingMode src>
+    int instr_srl() {
+        logfatal("instr_srl");
+    }
+
+    template<Register src>
+    int instr_srl() {
+        logfatal("instr_srl");
+    }
+
+    template<int n, AddressingMode src>
+    int instr_bit() {
+        u16 addr = get_address<src>();
+        u8 val = z80.read_byte(addr);
+        u8 res = val & (1 << n);
+        z80.f.s = ((s8)res) < 0;
+        z80.f.z = res == 0;
+        z80.f.b5 = (addr >> 5) & 1;
+        z80.f.h = true;
+        z80.f.b3 = (addr >> 3) & 1;
+        z80.f.p_v = res == 0;
+        z80.f.n = false;
+        return 20;
+    }
+
+    template<int n, Register src>
+    int instr_bit() {
+        u8 val = get_register<src>();
+        u8 res = val & (1 << n);
+        z80.f.s = ((s8)res) < 0;
+        z80.f.z = res == 0;
+        z80.f.b5 = (val >> 5) & 1;
+        z80.f.h = true;
+        z80.f.b3 = (val >> 3) & 1;
+        z80.f.p_v = res == 0;
+        z80.f.n = false;
+        return 20;
+    }
+
+    template<int n, AddressingMode src>
+    int instr_res() {
+        logfatal("instr_res");
+    }
+
+    template<int n, Register src>
+    int instr_res() {
+        logfatal("instr_res");
+    }
+
+    template<int n, AddressingMode src, Register reg>
+    int instr_res() {
+        logfatal("instr_res");
+    }
+
+    template<int n, AddressingMode src>
+    int instr_set() {
+        logfatal("instr_set");
+    }
+
+    template<int n, Register src>
+    int instr_set() {
+        logfatal("instr_set");
+    }
+
+    template<int n, AddressingMode src, Register reg>
+    int instr_set() {
+        logfatal("instr_set");
+    }
+
 
     const instruction instructions[0x100] = {
             /* 00 */ instr_nop,
@@ -1161,7 +1402,7 @@ namespace Z80 {
             /* C8 */ instr_ret<Condition::Z>,
             /* C9 */ instr_ret<Condition::Always>,
             /* CA */ instr_jp<Condition::Z, AddressingMode::Indirect>,
-            /* CB */ unimplemented_instr<0xCB>,
+            /* CB */ instr_cb,
             /* CC */ instr_call<Condition::Z>,
             /* CD */ instr_call<Condition::Always>,
             /* CE */ instr_adc<Register::A, AddressingMode::Immediate>,
@@ -1216,6 +1457,265 @@ namespace Z80 {
             /* FF */ unimplemented_instr<0xFF>,
     };
 
+    const instruction cb_instructions[0x100] = {
+            /* CB 00 */ instr_rlc<Register::B>,
+            /* CB 01 */ instr_rlc<Register::C>,
+            /* CB 02 */ instr_rlc<Register::D>,
+            /* CB 03 */ instr_rlc<Register::E>,
+            /* CB 04 */ instr_rlc<Register::H>,
+            /* CB 05 */ instr_rlc<Register::L>,
+            /* CB 06 */ instr_rlc<AddressingMode::HL>,
+            /* CB 07 */ instr_rlc<Register::A>,
+            /* CB 08 */ instr_rrc<Register::B>,
+            /* CB 09 */ instr_rrc<Register::C>,
+            /* CB 0A */ instr_rrc<Register::D>,
+            /* CB 0B */ instr_rrc<Register::E>,
+            /* CB 0C */ instr_rrc<Register::H>,
+            /* CB 0D */ instr_rrc<Register::L>,
+            /* CB 0E */ instr_rrc<AddressingMode::HL>,
+            /* CB 0F */ instr_rrc<Register::A>,
+            /* CB 10 */ instr_rl<Register::B>,
+            /* CB 11 */ instr_rl<Register::C>,
+            /* CB 12 */ instr_rl<Register::D>,
+            /* CB 13 */ instr_rl<Register::E>,
+            /* CB 14 */ instr_rl<Register::H>,
+            /* CB 15 */ instr_rl<Register::L>,
+            /* CB 16 */ instr_rl<AddressingMode::HL>,
+            /* CB 17 */ instr_rl<Register::A>,
+            /* CB 18 */ instr_rr<Register::B>,
+            /* CB 19 */ instr_rr<Register::C>,
+            /* CB 1A */ instr_rr<Register::D>,
+            /* CB 1B */ instr_rr<Register::E>,
+            /* CB 1C */ instr_rr<Register::H>,
+            /* CB 1D */ instr_rr<Register::L>,
+            /* CB 1E */ instr_rr<AddressingMode::HL>,
+            /* CB 1F */ instr_rr<AddressingMode::IXPlusPrevious, Register::A>,
+            /* CB 20 */ instr_sla<Register::B>,
+            /* CB 21 */ instr_sla<Register::C>,
+            /* CB 22 */ instr_sla<Register::D>,
+            /* CB 23 */ instr_sla<Register::E>,
+            /* CB 24 */ instr_sla<Register::H>,
+            /* CB 25 */ instr_sla<Register::L>,
+            /* CB 26 */ instr_sla<AddressingMode::HL>,
+            /* CB 27 */ instr_sla<Register::A>,
+            /* CB 28 */ instr_sra<Register::B>,
+            /* CB 29 */ instr_sra<Register::C>,
+            /* CB 2A */ instr_sra<Register::D>,
+            /* CB 2B */ instr_sra<Register::E>,
+            /* CB 2C */ instr_sra<Register::H>,
+            /* CB 2D */ instr_sra<Register::L>,
+            /* CB 2E */ instr_sra<AddressingMode::HL>,
+            /* CB 2F */ instr_sra<Register::A>,
+            /* CB 30 */ instr_sll<Register::B>,
+            /* CB 31 */ instr_sll<Register::C>,
+            /* CB 32 */ instr_sll<Register::D>,
+            /* CB 33 */ instr_sll<Register::E>,
+            /* CB 34 */ instr_sll<Register::H>,
+            /* CB 35 */ instr_sll<Register::L>,
+            /* CB 36 */ instr_sll<AddressingMode::HL>,
+            /* CB 37 */ instr_sll<Register::A>,
+            /* CB 38 */ instr_srl<Register::B>,
+            /* CB 39 */ instr_srl<Register::C>,
+            /* CB 3A */ instr_srl<Register::D>,
+            /* CB 3B */ instr_srl<Register::E>,
+            /* CB 3C */ instr_srl<Register::H>,
+            /* CB 3D */ instr_srl<Register::L>,
+            /* CB 3E */ instr_srl<AddressingMode::HL>,
+            /* CB 3F */ instr_srl<Register::A>,
+            /* CB 40 */ instr_bit<0, Register::B>,
+            /* CB 41 */ instr_bit<0, Register::C>,
+            /* CB 42 */ instr_bit<0, Register::D>,
+            /* CB 43 */ instr_bit<0, Register::E>,
+            /* CB 44 */ instr_bit<0, Register::H>,
+            /* CB 45 */ instr_bit<0, Register::L>,
+            /* CB 46 */ instr_bit<0, AddressingMode::HL>,
+            /* CB 47 */ instr_bit<0, Register::A>,
+            /* CB 48 */ instr_bit<1, Register::B>,
+            /* CB 49 */ instr_bit<1, Register::C>,
+            /* CB 4A */ instr_bit<1, Register::D>,
+            /* CB 4B */ instr_bit<1, Register::E>,
+            /* CB 4C */ instr_bit<1, Register::H>,
+            /* CB 4D */ instr_bit<1, Register::L>,
+            /* CB 4E */ instr_bit<1, AddressingMode::HL>,
+            /* CB 4F */ instr_bit<1, Register::A>,
+            /* CB 50 */ instr_bit<2, Register::B>,
+            /* CB 51 */ instr_bit<2, Register::C>,
+            /* CB 52 */ instr_bit<2, Register::D>,
+            /* CB 53 */ instr_bit<2, Register::E>,
+            /* CB 54 */ instr_bit<2, Register::H>,
+            /* CB 55 */ instr_bit<2, Register::L>,
+            /* CB 56 */ instr_bit<2, AddressingMode::HL>,
+            /* CB 57 */ instr_bit<2, Register::A>,
+            /* CB 58 */ instr_bit<3, Register::B>,
+            /* CB 59 */ instr_bit<3, Register::C>,
+            /* CB 5A */ instr_bit<3, Register::D>,
+            /* CB 5B */ instr_bit<3, Register::E>,
+            /* CB 5C */ instr_bit<3, Register::H>,
+            /* CB 5D */ instr_bit<3, Register::L>,
+            /* CB 5E */ instr_bit<3, AddressingMode::HL>,
+            /* CB 5F */ instr_bit<3, Register::A>,
+            /* CB 60 */ instr_bit<4, Register::B>,
+            /* CB 61 */ instr_bit<4, Register::C>,
+            /* CB 62 */ instr_bit<4, Register::D>,
+            /* CB 63 */ instr_bit<4, Register::E>,
+            /* CB 64 */ instr_bit<4, Register::H>,
+            /* CB 65 */ instr_bit<4, Register::L>,
+            /* CB 66 */ instr_bit<4, AddressingMode::HL>,
+            /* CB 67 */ instr_bit<4, Register::A>,
+            /* CB 68 */ instr_bit<5, Register::B>,
+            /* CB 69 */ instr_bit<5, Register::C>,
+            /* CB 6A */ instr_bit<5, Register::D>,
+            /* CB 6B */ instr_bit<5, Register::E>,
+            /* CB 6C */ instr_bit<5, Register::H>,
+            /* CB 6D */ instr_bit<5, Register::L>,
+            /* CB 6E */ instr_bit<5, AddressingMode::HL>,
+            /* CB 6F */ instr_bit<5, Register::A>,
+            /* CB 70 */ instr_bit<6, Register::B>,
+            /* CB 71 */ instr_bit<6, Register::C>,
+            /* CB 72 */ instr_bit<6, Register::D>,
+            /* CB 73 */ instr_bit<6, Register::E>,
+            /* CB 74 */ instr_bit<6, Register::H>,
+            /* CB 75 */ instr_bit<6, Register::L>,
+            /* CB 76 */ instr_bit<6, AddressingMode::HL>,
+            /* CB 77 */ instr_bit<6, Register::A>,
+            /* CB 78 */ instr_bit<7, Register::B>,
+            /* CB 79 */ instr_bit<7, Register::C>,
+            /* CB 7A */ instr_bit<7, Register::D>,
+            /* CB 7B */ instr_bit<7, Register::E>,
+            /* CB 7C */ instr_bit<7, Register::H>,
+            /* CB 7D */ instr_bit<7, Register::L>,
+            /* CB 7E */ instr_bit<7, AddressingMode::HL>,
+            /* CB 7F */ instr_bit<7, Register::A>,
+            /* CB 80 */ instr_res<0, Register::B>,
+            /* CB 81 */ instr_res<0, Register::C>,
+            /* CB 82 */ instr_res<0, Register::D>,
+            /* CB 83 */ instr_res<0, Register::E>,
+            /* CB 84 */ instr_res<0, Register::H>,
+            /* CB 85 */ instr_res<0, Register::L>,
+            /* CB 86 */ instr_res<0, AddressingMode::HL>,
+            /* CB 87 */ instr_res<0, Register::A>,
+            /* CB 88 */ instr_res<1, Register::B>,
+            /* CB 89 */ instr_res<1, Register::C>,
+            /* CB 8A */ instr_res<1, Register::D>,
+            /* CB 8B */ instr_res<1, Register::E>,
+            /* CB 8C */ instr_res<1, Register::H>,
+            /* CB 8D */ instr_res<1, Register::L>,
+            /* CB 8E */ instr_res<1, AddressingMode::HL>,
+            /* CB 8F */ instr_res<1, Register::A>,
+            /* CB 90 */ instr_res<2, Register::B>,
+            /* CB 91 */ instr_res<2, Register::C>,
+            /* CB 92 */ instr_res<2, Register::D>,
+            /* CB 93 */ instr_res<2, Register::E>,
+            /* CB 94 */ instr_res<2, Register::H>,
+            /* CB 95 */ instr_res<2, Register::L>,
+            /* CB 96 */ instr_res<2, AddressingMode::HL>,
+            /* CB 97 */ instr_res<2, Register::A>,
+            /* CB 98 */ instr_res<3, Register::B>,
+            /* CB 99 */ instr_res<3, Register::C>,
+            /* CB 9A */ instr_res<3, Register::D>,
+            /* CB 9B */ instr_res<3, Register::E>,
+            /* CB 9C */ instr_res<3, Register::H>,
+            /* CB 9D */ instr_res<3, Register::L>,
+            /* CB 9E */ instr_res<3, AddressingMode::HL>,
+            /* CB 9F */ instr_res<3, Register::A>,
+            /* CB A0 */ instr_res<4, Register::B>,
+            /* CB A1 */ instr_res<4, Register::C>,
+            /* CB A2 */ instr_res<4, Register::D>,
+            /* CB A3 */ instr_res<4, Register::E>,
+            /* CB A4 */ instr_res<4, Register::H>,
+            /* CB A5 */ instr_res<4, Register::L>,
+            /* CB A6 */ instr_res<4, AddressingMode::HL>,
+            /* CB A7 */ instr_res<4, Register::A>,
+            /* CB A8 */ instr_res<5, Register::B>,
+            /* CB A9 */ instr_res<5, Register::C>,
+            /* CB AA */ instr_res<5, Register::D>,
+            /* CB AB */ instr_res<5, Register::E>,
+            /* CB AC */ instr_res<5, Register::H>,
+            /* CB AD */ instr_res<5, Register::L>,
+            /* CB AE */ instr_res<5, AddressingMode::HL>,
+            /* CB AF */ instr_res<5, Register::A>,
+            /* CB B0 */ instr_res<6, Register::B>,
+            /* CB B1 */ instr_res<6, Register::C>,
+            /* CB B2 */ instr_res<6, Register::D>,
+            /* CB B3 */ instr_res<6, Register::E>,
+            /* CB B4 */ instr_res<6, Register::H>,
+            /* CB B5 */ instr_res<6, Register::L>,
+            /* CB B6 */ instr_res<6, AddressingMode::HL>,
+            /* CB B7 */ instr_res<6, Register::A>,
+            /* CB B8 */ instr_res<7, Register::B>,
+            /* CB B9 */ instr_res<7, Register::C>,
+            /* CB BA */ instr_res<7, Register::D>,
+            /* CB BB */ instr_res<7, Register::E>,
+            /* CB BC */ instr_res<7, Register::H>,
+            /* CB BD */ instr_res<7, Register::L>,
+            /* CB BE */ instr_res<7, AddressingMode::HL>,
+            /* CB BF */ instr_res<7, Register::A>,
+            /* CB C0 */ instr_set<0, Register::B>,
+            /* CB C1 */ instr_set<0, Register::C>,
+            /* CB C2 */ instr_set<0, Register::D>,
+            /* CB C3 */ instr_set<0, Register::E>,
+            /* CB C4 */ instr_set<0, Register::H>,
+            /* CB C5 */ instr_set<0, Register::L>,
+            /* CB C6 */ instr_set<0, AddressingMode::HL>,
+            /* CB C7 */ instr_set<0, Register::A>,
+            /* CB C8 */ instr_set<1, Register::B>,
+            /* CB C9 */ instr_set<1, Register::C>,
+            /* CB CA */ instr_set<1, Register::D>,
+            /* CB CB */ instr_set<1, Register::E>,
+            /* CB CC */ instr_set<1, Register::H>,
+            /* CB CD */ instr_set<1, Register::L>,
+            /* CB CE */ instr_set<1, AddressingMode::HL>,
+            /* CB CF */ instr_set<1, Register::A>,
+            /* CB D0 */ instr_set<2, Register::B>,
+            /* CB D1 */ instr_set<2, Register::C>,
+            /* CB D2 */ instr_set<2, Register::D>,
+            /* CB D3 */ instr_set<2, Register::E>,
+            /* CB D4 */ instr_set<2, Register::H>,
+            /* CB D5 */ instr_set<2, Register::L>,
+            /* CB D6 */ instr_set<2, AddressingMode::HL>,
+            /* CB D7 */ instr_set<2, Register::A>,
+            /* CB D8 */ instr_set<3, Register::B>,
+            /* CB D9 */ instr_set<3, Register::C>,
+            /* CB DA */ instr_set<3, Register::D>,
+            /* CB DB */ instr_set<3, Register::E>,
+            /* CB DC */ instr_set<3, Register::H>,
+            /* CB DD */ instr_set<3, Register::L>,
+            /* CB DE */ instr_set<3, AddressingMode::HL>,
+            /* CB DF */ instr_set<3, Register::A>,
+            /* CB E0 */ instr_set<4, Register::B>,
+            /* CB E1 */ instr_set<4, Register::C>,
+            /* CB E2 */ instr_set<4, Register::D>,
+            /* CB E3 */ instr_set<4, Register::E>,
+            /* CB E4 */ instr_set<4, Register::H>,
+            /* CB E5 */ instr_set<4, Register::L>,
+            /* CB E6 */ instr_set<4, AddressingMode::HL>,
+            /* CB E7 */ instr_set<4, Register::A>,
+            /* CB E8 */ instr_set<5, Register::B>,
+            /* CB E9 */ instr_set<5, Register::C>,
+            /* CB EA */ instr_set<5, Register::D>,
+            /* CB EB */ instr_set<5, Register::E>,
+            /* CB EC */ instr_set<5, Register::H>,
+            /* CB ED */ instr_set<5, Register::L>,
+            /* CB EE */ instr_set<5, AddressingMode::HL>,
+            /* CB EF */ instr_set<5, Register::A>,
+            /* CB F0 */ instr_set<6, Register::B>,
+            /* CB F1 */ instr_set<6, Register::C>,
+            /* CB F2 */ instr_set<6, Register::D>,
+            /* CB F3 */ instr_set<6, Register::E>,
+            /* CB F4 */ instr_set<6, Register::H>,
+            /* CB F5 */ instr_set<6, Register::L>,
+            /* CB F6 */ instr_set<6, AddressingMode::HL>,
+            /* CB F7 */ instr_set<6, Register::A>,
+            /* CB F8 */ instr_set<7, Register::B>,
+            /* CB F9 */ instr_set<7, Register::C>,
+            /* CB FA */ instr_set<7, Register::D>,
+            /* CB FB */ instr_set<7, Register::E>,
+            /* CB FC */ instr_set<7, Register::H>,
+            /* CB FD */ instr_set<7, Register::L>,
+            /* CB FE */ instr_set<7, AddressingMode::HL>,
+            /* CB FF */ instr_set<7, Register::A>
+    };
+
     const instruction dd_instructions[0x100] = {
             /* DD 00 */ unimplemented_dd_instr<0x00>,
             /* DD 01 */ unimplemented_dd_instr<0x01>,
@@ -1251,26 +1751,26 @@ namespace Z80 {
             /* DD 1F */ unimplemented_dd_instr<0x1F>,
             /* DD 20 */ unimplemented_dd_instr<0x20>,
             /* DD 21 */ instr_ld<Register::IX, AddressingMode::Immediate>,
-            /* DD 22 */ unimplemented_dd_instr<0x22>,
+            /* DD 22 */ instr_ld<AddressingMode::Indirect, Register::IX>,
             /* DD 23 */ instr_inc<Register::IX>,
-            /* DD 24 */ unimplemented_dd_instr<0x24>,
-            /* DD 25 */ unimplemented_dd_instr<0x25>,
-            /* DD 26 */ unimplemented_dd_instr<0x26>,
+            /* DD 24 */ instr_inc<Register::IXH>,
+            /* DD 25 */ instr_dec<Register::IXH>,
+            /* DD 26 */ instr_ld<Register::IXH, AddressingMode::Immediate>,
             /* DD 27 */ unimplemented_dd_instr<0x27>,
             /* DD 28 */ unimplemented_dd_instr<0x28>,
             /* DD 29 */ instr_add<Register::IX, Register::IX>,
-            /* DD 2A */ unimplemented_dd_instr<0x2A>,
-            /* DD 2B */ unimplemented_dd_instr<0x2B>,
-            /* DD 2C */ unimplemented_dd_instr<0x2C>,
-            /* DD 2D */ unimplemented_dd_instr<0x2D>,
-            /* DD 2E */ unimplemented_dd_instr<0x2E>,
+            /* DD 2A */ instr_ld<Register::IX, AddressingMode::Indirect>,
+            /* DD 2B */ instr_dec<Register::IX>,
+            /* DD 2C */ instr_inc<Register::IXL>,
+            /* DD 2D */ instr_dec<Register::IXL>,
+            /* DD 2E */ instr_ld<Register::IXL, AddressingMode::Immediate>,
             /* DD 2F */ unimplemented_dd_instr<0x2F>,
             /* DD 30 */ unimplemented_dd_instr<0x30>,
             /* DD 31 */ unimplemented_dd_instr<0x31>,
             /* DD 32 */ unimplemented_dd_instr<0x32>,
             /* DD 33 */ unimplemented_dd_instr<0x33>,
-            /* DD 34 */ unimplemented_dd_instr<0x34>,
-            /* DD 35 */ unimplemented_dd_instr<0x35>,
+            /* DD 34 */ instr_inc<AddressingMode::IXPlus>,
+            /* DD 35 */ instr_dec<AddressingMode::IXPlus>,
             /* DD 36 */ unimplemented_dd_instr<0x36>,
             /* DD 37 */ unimplemented_dd_instr<0x37>,
             /* DD 38 */ unimplemented_dd_instr<0x38>,
@@ -1285,64 +1785,64 @@ namespace Z80 {
             /* DD 41 */ unimplemented_dd_instr<0x41>,
             /* DD 42 */ unimplemented_dd_instr<0x42>,
             /* DD 43 */ unimplemented_dd_instr<0x43>,
-            /* DD 44 */ unimplemented_dd_instr<0x44>,
-            /* DD 45 */ unimplemented_dd_instr<0x45>,
-            /* DD 46 */ unimplemented_dd_instr<0x46>,
+            /* DD 44 */ instr_ld<Register::B, Register::IXH>,
+            /* DD 45 */ instr_ld<Register::B, Register::IXL>,
+            /* DD 46 */ instr_ld<Register::B, AddressingMode::IXPlus>,
             /* DD 47 */ unimplemented_dd_instr<0x47>,
             /* DD 48 */ unimplemented_dd_instr<0x48>,
             /* DD 49 */ unimplemented_dd_instr<0x49>,
             /* DD 4A */ unimplemented_dd_instr<0x4A>,
             /* DD 4B */ unimplemented_dd_instr<0x4B>,
-            /* DD 4C */ unimplemented_dd_instr<0x4C>,
-            /* DD 4D */ unimplemented_dd_instr<0x4D>,
-            /* DD 4E */ unimplemented_dd_instr<0x4E>,
+            /* DD 4C */ instr_ld<Register::C, Register::IXH>,
+            /* DD 4D */ instr_ld<Register::C, Register::IXL>,
+            /* DD 4E */ instr_ld<Register::C, AddressingMode::IXPlus>,
             /* DD 4F */ unimplemented_dd_instr<0x4F>,
             /* DD 50 */ unimplemented_dd_instr<0x50>,
             /* DD 51 */ unimplemented_dd_instr<0x51>,
             /* DD 52 */ unimplemented_dd_instr<0x52>,
             /* DD 53 */ unimplemented_dd_instr<0x53>,
             /* DD 54 */ unimplemented_dd_instr<0x54>,
-            /* DD 55 */ unimplemented_dd_instr<0x55>,
-            /* DD 56 */ unimplemented_dd_instr<0x56>,
-            /* DD 57 */ unimplemented_dd_instr<0x57>,
+            /* DD 55 */ instr_ld<Register::D, Register::IXH>,
+            /* DD 56 */ instr_ld<Register::D, Register::IXL>,
+            /* DD 57 */ instr_ld<Register::D, AddressingMode::IXPlus>,
             /* DD 58 */ unimplemented_dd_instr<0x58>,
             /* DD 59 */ unimplemented_dd_instr<0x59>,
             /* DD 5A */ unimplemented_dd_instr<0x5A>,
             /* DD 5B */ unimplemented_dd_instr<0x5B>,
-            /* DD 5C */ unimplemented_dd_instr<0x5C>,
-            /* DD 5D */ unimplemented_dd_instr<0x5D>,
-            /* DD 5E */ unimplemented_dd_instr<0x5E>,
+            /* DD 5C */ instr_ld<Register::E, Register::IXH>,
+            /* DD 5D */ instr_ld<Register::E, Register::IXL>,
+            /* DD 5E */ instr_ld<Register::E, AddressingMode::IXPlus>,
             /* DD 5F */ unimplemented_dd_instr<0x5F>,
-            /* DD 60 */ unimplemented_dd_instr<0x60>,
-            /* DD 61 */ unimplemented_dd_instr<0x61>,
-            /* DD 62 */ unimplemented_dd_instr<0x62>,
-            /* DD 63 */ unimplemented_dd_instr<0x63>,
-            /* DD 64 */ unimplemented_dd_instr<0x64>,
-            /* DD 65 */ unimplemented_dd_instr<0x65>,
-            /* DD 66 */ unimplemented_dd_instr<0x66>,
-            /* DD 67 */ unimplemented_dd_instr<0x67>,
-            /* DD 68 */ unimplemented_dd_instr<0x68>,
-            /* DD 69 */ unimplemented_dd_instr<0x69>,
-            /* DD 6A */ unimplemented_dd_instr<0x6A>,
-            /* DD 6B */ unimplemented_dd_instr<0x6B>,
-            /* DD 6C */ unimplemented_dd_instr<0x6C>,
-            /* DD 6D */ unimplemented_dd_instr<0x6D>,
-            /* DD 6E */ unimplemented_dd_instr<0x6E>,
-            /* DD 6F */ unimplemented_dd_instr<0x6F>,
-            /* DD 70 */ unimplemented_dd_instr<0x70>,
-            /* DD 71 */ unimplemented_dd_instr<0x71>,
-            /* DD 72 */ unimplemented_dd_instr<0x72>,
-            /* DD 73 */ unimplemented_dd_instr<0x73>,
-            /* DD 74 */ unimplemented_dd_instr<0x74>,
-            /* DD 75 */ unimplemented_dd_instr<0x75>,
+            /* DD 60 */ instr_ld<Register::IXH, Register::B>,
+            /* DD 61 */ instr_ld<Register::IXH, Register::C>,
+            /* DD 62 */ instr_ld<Register::IXH, Register::D>,
+            /* DD 63 */ instr_ld<Register::IXH, Register::E>,
+            /* DD 64 */ instr_ld<Register::IXH, Register::IXH>,
+            /* DD 65 */ instr_ld<Register::IXH, Register::IXL>,
+            /* DD 66 */ instr_ld<Register::H, AddressingMode::IXPlus>,
+            /* DD 67 */ instr_ld<Register::IXH, Register::A>,
+            /* DD 68 */ instr_ld<Register::IXL, Register::B>,
+            /* DD 69 */ instr_ld<Register::IXL, Register::C>,
+            /* DD 6A */ instr_ld<Register::IXL, Register::D>,
+            /* DD 6B */ instr_ld<Register::IXL, Register::E>,
+            /* DD 6C */ instr_ld<Register::IXL, Register::IXH>,
+            /* DD 6D */ instr_ld<Register::IXL, Register::IXL>,
+            /* DD 6E */ instr_ld<Register::L, AddressingMode::IXPlus>,
+            /* DD 6F */ instr_ld<Register::IXL, Register::A>,
+            /* DD 70 */ instr_ld<AddressingMode::IXPlus, Register::B>,
+            /* DD 71 */ instr_ld<AddressingMode::IXPlus, Register::C>,
+            /* DD 72 */ instr_ld<AddressingMode::IXPlus, Register::D>,
+            /* DD 73 */ instr_ld<AddressingMode::IXPlus, Register::E>,
+            /* DD 74 */ instr_ld<AddressingMode::IXPlus, Register::H>,
+            /* DD 75 */ instr_ld<AddressingMode::IXPlus, Register::L>,
             /* DD 76 */ unimplemented_dd_instr<0x76>,
-            /* DD 77 */ unimplemented_dd_instr<0x77>,
+            /* DD 77 */ instr_ld<AddressingMode::IXPlus, Register::A>,
             /* DD 78 */ unimplemented_dd_instr<0x78>,
             /* DD 79 */ unimplemented_dd_instr<0x79>,
             /* DD 7A */ unimplemented_dd_instr<0x7A>,
             /* DD 7B */ unimplemented_dd_instr<0x7B>,
-            /* DD 7C */ unimplemented_dd_instr<0x7C>,
-            /* DD 7D */ unimplemented_dd_instr<0x7D>,
+            /* DD 7C */ instr_ld<Register::A, Register::IXH>,
+            /* DD 7D */ instr_ld<Register::A, Register::IXL>,
             /* DD 7E */ instr_ld<Register::A, AddressingMode::IXPlus>,
             /* DD 7F */ unimplemented_dd_instr<0x7F>,
             /* DD 80 */ unimplemented_dd_instr<0x80>,
@@ -1351,7 +1851,7 @@ namespace Z80 {
             /* DD 83 */ unimplemented_dd_instr<0x83>,
             /* DD 84 */ instr_add<Register::A, Register::IXH>,
             /* DD 85 */ instr_add<Register::A, Register::IXL>,
-            /* DD 86 */ unimplemented_dd_instr<0x86>,
+            /* DD 86 */ instr_add<Register::A, AddressingMode::IXPlus>,
             /* DD 87 */ unimplemented_dd_instr<0x87>,
             /* DD 88 */ unimplemented_dd_instr<0x88>,
             /* DD 89 */ unimplemented_dd_instr<0x89>,
@@ -1359,7 +1859,7 @@ namespace Z80 {
             /* DD 8B */ unimplemented_dd_instr<0x8B>,
             /* DD 8C */ instr_adc<Register::A, Register::IXH>,
             /* DD 8D */ instr_adc<Register::A, Register::IXL>,
-            /* DD 8E */ unimplemented_dd_instr<0x8E>,
+            /* DD 8E */ instr_adc<Register::A, AddressingMode::IXPlus>,
             /* DD 8F */ unimplemented_dd_instr<0x8F>,
             /* DD 90 */ unimplemented_dd_instr<0x90>,
             /* DD 91 */ unimplemented_dd_instr<0x91>,
@@ -1367,47 +1867,47 @@ namespace Z80 {
             /* DD 93 */ unimplemented_dd_instr<0x93>,
             /* DD 94 */ instr_sub<Register::IXH>,
             /* DD 95 */ instr_sub<Register::IXL>,
-            /* DD 96 */ unimplemented_dd_instr<0x96>,
+            /* DD 96 */ instr_sub<AddressingMode::IXPlus>,
             /* DD 97 */ unimplemented_dd_instr<0x97>,
             /* DD 98 */ unimplemented_dd_instr<0x98>,
             /* DD 99 */ unimplemented_dd_instr<0x99>,
             /* DD 9A */ unimplemented_dd_instr<0x9A>,
             /* DD 9B */ unimplemented_dd_instr<0x9B>,
-            /* DD 9C */ unimplemented_dd_instr<0x9C>,
-            /* DD 9D */ unimplemented_dd_instr<0x9D>,
-            /* DD 9E */ unimplemented_dd_instr<0x9E>,
+            /* DD 9C */ instr_sbc<Register::A, Register::IXH>,
+            /* DD 9D */ instr_sbc<Register::A, Register::IXL>,
+            /* DD 9E */ instr_sbc<Register::A, AddressingMode::IXPlus>,
             /* DD 9F */ unimplemented_dd_instr<0x9F>,
             /* DD A0 */ unimplemented_dd_instr<0xA0>,
             /* DD A1 */ unimplemented_dd_instr<0xA1>,
             /* DD A2 */ unimplemented_dd_instr<0xA2>,
             /* DD A3 */ unimplemented_dd_instr<0xA3>,
-            /* DD A4 */ unimplemented_dd_instr<0xA4>,
-            /* DD A5 */ unimplemented_dd_instr<0xA5>,
-            /* DD A6 */ unimplemented_dd_instr<0xA6>,
+            /* DD A4 */ instr_and<Register::IXH>,
+            /* DD A5 */ instr_and<Register::IXL>,
+            /* DD A6 */ instr_and<AddressingMode::IXPlus>,
             /* DD A7 */ unimplemented_dd_instr<0xA7>,
             /* DD A8 */ unimplemented_dd_instr<0xA8>,
             /* DD A9 */ unimplemented_dd_instr<0xA9>,
             /* DD AA */ unimplemented_dd_instr<0xAA>,
             /* DD AB */ unimplemented_dd_instr<0xAB>,
-            /* DD AC */ unimplemented_dd_instr<0xAC>,
-            /* DD AD */ unimplemented_dd_instr<0xAD>,
-            /* DD AE */ unimplemented_dd_instr<0xAE>,
+            /* DD AC */ instr_xor<Register::IXH>,
+            /* DD AD */ instr_xor<Register::IXL>,
+            /* DD AE */ instr_xor<AddressingMode::IXPlus>,
             /* DD AF */ unimplemented_dd_instr<0xAF>,
             /* DD B0 */ unimplemented_dd_instr<0xB0>,
             /* DD B1 */ unimplemented_dd_instr<0xB1>,
             /* DD B2 */ unimplemented_dd_instr<0xB2>,
             /* DD B3 */ unimplemented_dd_instr<0xB3>,
-            /* DD B4 */ unimplemented_dd_instr<0xB4>,
-            /* DD B5 */ unimplemented_dd_instr<0xB5>,
-            /* DD B6 */ unimplemented_dd_instr<0xB6>,
+            /* DD B4 */ instr_or<Register::IXH>,
+            /* DD B5 */ instr_or<Register::IXL>,
+            /* DD B6 */ instr_or<AddressingMode::IXPlus>,
             /* DD B7 */ unimplemented_dd_instr<0xB7>,
             /* DD B8 */ unimplemented_dd_instr<0xB8>,
             /* DD B9 */ unimplemented_dd_instr<0xB9>,
             /* DD BA */ unimplemented_dd_instr<0xBA>,
             /* DD BB */ unimplemented_dd_instr<0xBB>,
-            /* DD BC */ unimplemented_dd_instr<0xBC>,
-            /* DD BD */ unimplemented_dd_instr<0xBD>,
-            /* DD BE */ unimplemented_dd_instr<0xBE>,
+            /* DD BC */ instr_cp<Register::IXH>,
+            /* DD BD */ instr_cp<Register::IXL>,
+            /* DD BE */ instr_cp<AddressingMode::IXPlus>,
             /* DD BF */ unimplemented_dd_instr<0xBF>,
             /* DD C0 */ unimplemented_dd_instr<0xC0>,
             /* DD C1 */ unimplemented_dd_instr<0xC1>,
@@ -1420,7 +1920,7 @@ namespace Z80 {
             /* DD C8 */ unimplemented_dd_instr<0xC8>,
             /* DD C9 */ unimplemented_dd_instr<0xC9>,
             /* DD CA */ unimplemented_dd_instr<0xCA>,
-            /* DD CB */ unimplemented_dd_instr<0xCB>,
+            /* DD CB */ instr_ddcb,
             /* DD CC */ unimplemented_dd_instr<0xCC>,
             /* DD CD */ unimplemented_dd_instr<0xCD>,
             /* DD CE */ unimplemented_dd_instr<0xCE>,
@@ -1473,6 +1973,265 @@ namespace Z80 {
             /* DD FD */ unimplemented_dd_instr<0xFD>,
             /* DD FE */ unimplemented_dd_instr<0xFE>,
             /* DD FF */ unimplemented_dd_instr<0xFF>,
+    };
+
+    const instruction ddcb_instructions[0x100] = {
+            /* DD CB 00 */ instr_rlc<AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 01 */ instr_rlc<AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 02 */ instr_rlc<AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 03 */ instr_rlc<AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 04 */ instr_rlc<AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 05 */ instr_rlc<AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 06 */ instr_rlc<AddressingMode::IXPlusPrevious>,
+            /* DD CB 07 */ instr_rlc<AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 08 */ instr_rrc<AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 09 */ instr_rrc<AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 0A */ instr_rrc<AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 0B */ instr_rrc<AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 0C */ instr_rrc<AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 0D */ instr_rrc<AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 0E */ instr_rrc<AddressingMode::IXPlusPrevious>,
+            /* DD CB 0F */ instr_rrc<AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 10 */ instr_rl<AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 11 */ instr_rl<AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 12 */ instr_rl<AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 13 */ instr_rl<AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 14 */ instr_rl<AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 15 */ instr_rl<AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 16 */ instr_rl<AddressingMode::IXPlusPrevious>,
+            /* DD CB 17 */ instr_rl<AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 18 */ instr_rr<AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 19 */ instr_rr<AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 1A */ instr_rr<AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 1B */ instr_rr<AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 1C */ instr_rr<AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 1D */ instr_rr<AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 1E */ instr_rr<AddressingMode::IXPlusPrevious>,
+            /* DD CB 1F */ instr_rr<AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 20 */ instr_sla<AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 21 */ instr_sla<AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 22 */ instr_sla<AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 23 */ instr_sla<AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 24 */ instr_sla<AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 25 */ instr_sla<AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 26 */ instr_sla<AddressingMode::IXPlusPrevious>,
+            /* DD CB 27 */ instr_sla<AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 28 */ instr_sra<AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 29 */ instr_sra<AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 2A */ instr_sra<AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 2B */ instr_sra<AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 2C */ instr_sra<AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 2D */ instr_sra<AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 2E */ instr_sra<AddressingMode::IXPlusPrevious>,
+            /* DD CB 2F */ instr_sra<AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 30 */ instr_sll<AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 31 */ instr_sll<AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 32 */ instr_sll<AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 33 */ instr_sll<AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 34 */ instr_sll<AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 35 */ instr_sll<AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 36 */ instr_sll<AddressingMode::IXPlusPrevious>,
+            /* DD CB 37 */ instr_sll<AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 38 */ instr_srl<AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 39 */ instr_srl<AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 3A */ instr_srl<AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 3B */ instr_srl<AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 3C */ instr_srl<AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 3D */ instr_srl<AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 3E */ instr_srl<AddressingMode::IXPlusPrevious>,
+            /* DD CB 3F */ instr_srl<AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 40 */ instr_bit<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 41 */ instr_bit<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 42 */ instr_bit<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 43 */ instr_bit<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 44 */ instr_bit<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 45 */ instr_bit<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 46 */ instr_bit<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 47 */ instr_bit<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 48 */ instr_bit<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 49 */ instr_bit<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 4A */ instr_bit<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 4B */ instr_bit<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 4C */ instr_bit<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 4D */ instr_bit<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 4E */ instr_bit<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 4F */ instr_bit<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 50 */ instr_bit<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 51 */ instr_bit<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 52 */ instr_bit<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 53 */ instr_bit<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 54 */ instr_bit<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 55 */ instr_bit<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 56 */ instr_bit<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 57 */ instr_bit<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 58 */ instr_bit<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 59 */ instr_bit<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 5A */ instr_bit<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 5B */ instr_bit<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 5C */ instr_bit<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 5D */ instr_bit<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 5E */ instr_bit<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 5F */ instr_bit<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 60 */ instr_bit<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB 61 */ instr_bit<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB 62 */ instr_bit<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB 63 */ instr_bit<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB 64 */ instr_bit<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB 65 */ instr_bit<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB 66 */ instr_bit<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB 67 */ instr_bit<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB 68 */ instr_bit<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB 69 */ instr_bit<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB 6A */ instr_bit<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB 6B */ instr_bit<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB 6C */ instr_bit<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB 6D */ instr_bit<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB 6E */ instr_bit<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB 6F */ instr_bit<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB 70 */ instr_bit<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB 71 */ instr_bit<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB 72 */ instr_bit<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB 73 */ instr_bit<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB 74 */ instr_bit<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB 75 */ instr_bit<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB 76 */ instr_bit<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB 77 */ instr_bit<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB 78 */ instr_bit<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB 79 */ instr_bit<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB 7A */ instr_bit<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB 7B */ instr_bit<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB 7C */ instr_bit<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB 7D */ instr_bit<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB 7E */ instr_bit<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB 7F */ instr_bit<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB 80 */ instr_res<0, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 81 */ instr_res<0, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 82 */ instr_res<0, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 83 */ instr_res<0, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 84 */ instr_res<0, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 85 */ instr_res<0, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 86 */ instr_res<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB 87 */ instr_res<0, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 88 */ instr_res<1, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 89 */ instr_res<1, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 8A */ instr_res<1, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 8B */ instr_res<1, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 8C */ instr_res<1, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 8D */ instr_res<1, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 8E */ instr_res<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB 8F */ instr_res<1, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 90 */ instr_res<2, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 91 */ instr_res<2, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 92 */ instr_res<2, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 93 */ instr_res<2, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 94 */ instr_res<2, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 95 */ instr_res<2, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 96 */ instr_res<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB 97 */ instr_res<2, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB 98 */ instr_res<3, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB 99 */ instr_res<3, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB 9A */ instr_res<3, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB 9B */ instr_res<3, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB 9C */ instr_res<3, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB 9D */ instr_res<3, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB 9E */ instr_res<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB 9F */ instr_res<3, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB A0 */ instr_res<4, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB A1 */ instr_res<4, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB A2 */ instr_res<4, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB A3 */ instr_res<4, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB A4 */ instr_res<4, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB A5 */ instr_res<4, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB A6 */ instr_res<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB A7 */ instr_res<4, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB A8 */ instr_res<5, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB A9 */ instr_res<5, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB AA */ instr_res<5, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB AB */ instr_res<5, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB AC */ instr_res<5, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB AD */ instr_res<5, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB AE */ instr_res<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB AF */ instr_res<5, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB B0 */ instr_res<6, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB B1 */ instr_res<6, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB B2 */ instr_res<6, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB B3 */ instr_res<6, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB B4 */ instr_res<6, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB B5 */ instr_res<6, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB B6 */ instr_res<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB B7 */ instr_res<6, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB B8 */ instr_res<7, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB B9 */ instr_res<7, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB BA */ instr_res<7, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB BB */ instr_res<7, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB BC */ instr_res<7, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB BD */ instr_res<7, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB BE */ instr_res<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB BF */ instr_res<7, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB C0 */ instr_set<0, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB C1 */ instr_set<0, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB C2 */ instr_set<0, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB C3 */ instr_set<0, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB C4 */ instr_set<0, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB C5 */ instr_set<0, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB C6 */ instr_set<0, AddressingMode::IXPlusPrevious>,
+            /* DD CB C7 */ instr_set<0, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB C8 */ instr_set<1, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB C9 */ instr_set<1, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB CA */ instr_set<1, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB CB */ instr_set<1, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB CC */ instr_set<1, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB CD */ instr_set<1, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB CE */ instr_set<1, AddressingMode::IXPlusPrevious>,
+            /* DD CB CF */ instr_set<1, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB D0 */ instr_set<2, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB D1 */ instr_set<2, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB D2 */ instr_set<2, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB D3 */ instr_set<2, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB D4 */ instr_set<2, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB D5 */ instr_set<2, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB D6 */ instr_set<2, AddressingMode::IXPlusPrevious>,
+            /* DD CB D7 */ instr_set<2, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB D8 */ instr_set<3, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB D9 */ instr_set<3, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB DA */ instr_set<3, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB DB */ instr_set<3, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB DC */ instr_set<3, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB DD */ instr_set<3, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB DE */ instr_set<3, AddressingMode::IXPlusPrevious>,
+            /* DD CB DF */ instr_set<3, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB E0 */ instr_set<4, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB E1 */ instr_set<4, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB E2 */ instr_set<4, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB E3 */ instr_set<4, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB E4 */ instr_set<4, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB E5 */ instr_set<4, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB E6 */ instr_set<4, AddressingMode::IXPlusPrevious>,
+            /* DD CB E7 */ instr_set<4, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB E8 */ instr_set<5, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB E9 */ instr_set<5, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB EA */ instr_set<5, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB EB */ instr_set<5, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB EC */ instr_set<5, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB ED */ instr_set<5, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB EE */ instr_set<5, AddressingMode::IXPlusPrevious>,
+            /* DD CB EF */ instr_set<5, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB F0 */ instr_set<6, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB F1 */ instr_set<6, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB F2 */ instr_set<6, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB F3 */ instr_set<6, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB F4 */ instr_set<6, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB F5 */ instr_set<6, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB F6 */ instr_set<6, AddressingMode::IXPlusPrevious>,
+            /* DD CB F7 */ instr_set<6, AddressingMode::IXPlusPrevious, Register::A>,
+            /* DD CB F8 */ instr_set<7, AddressingMode::IXPlusPrevious, Register::B>,
+            /* DD CB F9 */ instr_set<7, AddressingMode::IXPlusPrevious, Register::C>,
+            /* DD CB FA */ instr_set<7, AddressingMode::IXPlusPrevious, Register::D>,
+            /* DD CB FB */ instr_set<7, AddressingMode::IXPlusPrevious, Register::E>,
+            /* DD CB FC */ instr_set<7, AddressingMode::IXPlusPrevious, Register::H>,
+            /* DD CB FD */ instr_set<7, AddressingMode::IXPlusPrevious, Register::L>,
+            /* DD CB FE */ instr_set<7, AddressingMode::IXPlusPrevious>,
+            /* DD CB FF */ instr_set<7, AddressingMode::IXPlusPrevious, Register::A>
     };
 
     const instruction ed_instructions[0xC0] = {
@@ -1713,18 +2472,18 @@ namespace Z80 {
             /* FD 27 */ unimplemented_fd_instr<0x27>,
             /* FD 28 */ unimplemented_fd_instr<0x28>,
             /* FD 29 */ instr_add<Register::IY, Register::IY>,
-            /* FD 2A */ unimplemented_fd_instr<0x2A>,
-            /* FD 2B */ unimplemented_fd_instr<0x2B>,
-            /* FD 2C */ unimplemented_fd_instr<0x2C>,
-            /* FD 2D */ unimplemented_fd_instr<0x2D>,
-            /* FD 2E */ unimplemented_fd_instr<0x2E>,
+            /* FD 2A */ instr_ld<Register::IY, AddressingMode::Indirect>,
+            /* FD 2B */ instr_dec<Register::IY>,
+            /* FD 2C */ instr_inc<Register::IYL>,
+            /* FD 2D */ instr_dec<Register::IYL>,
+            /* FD 2E */ instr_ld<Register::IYL, AddressingMode::Immediate>,
             /* FD 2F */ unimplemented_fd_instr<0x2F>,
             /* FD 30 */ unimplemented_fd_instr<0x30>,
             /* FD 31 */ unimplemented_fd_instr<0x31>,
             /* FD 32 */ unimplemented_fd_instr<0x32>,
             /* FD 33 */ unimplemented_fd_instr<0x33>,
-            /* FD 34 */ unimplemented_fd_instr<0x34>,
-            /* FD 35 */ unimplemented_fd_instr<0x35>,
+            /* FD 34 */ instr_inc<AddressingMode::IYPlus>,
+            /* FD 35 */ instr_dec<AddressingMode::IYPlus>,
             /* FD 36 */ unimplemented_fd_instr<0x36>,
             /* FD 37 */ unimplemented_fd_instr<0x37>,
             /* FD 38 */ unimplemented_fd_instr<0x38>,
@@ -1739,64 +2498,64 @@ namespace Z80 {
             /* FD 41 */ unimplemented_fd_instr<0x41>,
             /* FD 42 */ unimplemented_fd_instr<0x42>,
             /* FD 43 */ unimplemented_fd_instr<0x43>,
-            /* FD 44 */ unimplemented_fd_instr<0x44>,
-            /* FD 45 */ unimplemented_fd_instr<0x45>,
-            /* FD 46 */ unimplemented_fd_instr<0x46>,
+            /* FD 44 */ instr_ld<Register::B, Register::IYH>,
+            /* FD 45 */ instr_ld<Register::B, Register::IYL>,
+            /* FD 46 */ instr_ld<Register::B, AddressingMode::IYPlus>,
             /* FD 47 */ unimplemented_fd_instr<0x47>,
             /* FD 48 */ unimplemented_fd_instr<0x48>,
             /* FD 49 */ unimplemented_fd_instr<0x49>,
             /* FD 4A */ unimplemented_fd_instr<0x4A>,
             /* FD 4B */ unimplemented_fd_instr<0x4B>,
-            /* FD 4C */ unimplemented_fd_instr<0x4C>,
-            /* FD 4D */ unimplemented_fd_instr<0x4D>,
-            /* FD 4E */ unimplemented_fd_instr<0x4E>,
+            /* FD 4C */ instr_ld<Register::C, Register::IYH>,
+            /* FD 4D */ instr_ld<Register::C, Register::IYL>,
+            /* FD 4E */ instr_ld<Register::C, AddressingMode::IYPlus>,
             /* FD 4F */ unimplemented_fd_instr<0x4F>,
             /* FD 50 */ unimplemented_fd_instr<0x50>,
             /* FD 51 */ unimplemented_fd_instr<0x51>,
             /* FD 52 */ unimplemented_fd_instr<0x52>,
             /* FD 53 */ unimplemented_fd_instr<0x53>,
             /* FD 54 */ unimplemented_fd_instr<0x54>,
-            /* FD 55 */ unimplemented_fd_instr<0x55>,
-            /* FD 56 */ unimplemented_fd_instr<0x56>,
-            /* FD 57 */ unimplemented_fd_instr<0x57>,
+            /* FD 55 */ instr_ld<Register::D, Register::IYH>,
+            /* FD 56 */ instr_ld<Register::D, Register::IYL>,
+            /* FD 57 */ instr_ld<Register::D, AddressingMode::IYPlus>,
             /* FD 58 */ unimplemented_fd_instr<0x58>,
             /* FD 59 */ unimplemented_fd_instr<0x59>,
             /* FD 5A */ unimplemented_fd_instr<0x5A>,
             /* FD 5B */ unimplemented_fd_instr<0x5B>,
-            /* FD 5C */ unimplemented_fd_instr<0x5C>,
-            /* FD 5D */ unimplemented_fd_instr<0x5D>,
-            /* FD 5E */ unimplemented_fd_instr<0x5E>,
+            /* FD 5C */ instr_ld<Register::E, Register::IYH>,
+            /* FD 5D */ instr_ld<Register::E, Register::IYL>,
+            /* FD 5E */ instr_ld<Register::E, AddressingMode::IYPlus>,
             /* FD 5F */ unimplemented_fd_instr<0x5F>,
-            /* FD 60 */ unimplemented_fd_instr<0x60>,
-            /* FD 61 */ unimplemented_fd_instr<0x61>,
-            /* FD 62 */ unimplemented_fd_instr<0x62>,
-            /* FD 63 */ unimplemented_fd_instr<0x63>,
-            /* FD 64 */ unimplemented_fd_instr<0x64>,
-            /* FD 65 */ unimplemented_fd_instr<0x65>,
-            /* FD 66 */ unimplemented_fd_instr<0x66>,
-            /* FD 67 */ unimplemented_fd_instr<0x67>,
-            /* FD 68 */ unimplemented_fd_instr<0x68>,
-            /* FD 69 */ unimplemented_fd_instr<0x69>,
-            /* FD 6A */ unimplemented_fd_instr<0x6A>,
-            /* FD 6B */ unimplemented_fd_instr<0x6B>,
-            /* FD 6C */ unimplemented_fd_instr<0x6C>,
-            /* FD 6D */ unimplemented_fd_instr<0x6D>,
-            /* FD 6E */ unimplemented_fd_instr<0x6E>,
-            /* FD 6F */ unimplemented_fd_instr<0x6F>,
-            /* FD 70 */ unimplemented_fd_instr<0x70>,
-            /* FD 71 */ unimplemented_fd_instr<0x71>,
-            /* FD 72 */ unimplemented_fd_instr<0x72>,
-            /* FD 73 */ unimplemented_fd_instr<0x73>,
-            /* FD 74 */ unimplemented_fd_instr<0x74>,
-            /* FD 75 */ unimplemented_fd_instr<0x75>,
+            /* FD 60 */ instr_ld<Register::IYH, Register::B>,
+            /* FD 61 */ instr_ld<Register::IYH, Register::C>,
+            /* FD 62 */ instr_ld<Register::IYH, Register::D>,
+            /* FD 63 */ instr_ld<Register::IYH, Register::E>,
+            /* FD 64 */ instr_ld<Register::IYH, Register::IYH>,
+            /* FD 65 */ instr_ld<Register::IYH, Register::IYL>,
+            /* FD 66 */ instr_ld<Register::H, AddressingMode::IYPlus>,
+            /* FD 67 */ instr_ld<Register::IYH, Register::A>,
+            /* FD 68 */ instr_ld<Register::IYL, Register::B>,
+            /* FD 69 */ instr_ld<Register::IYL, Register::C>,
+            /* FD 6A */ instr_ld<Register::IYL, Register::D>,
+            /* FD 6B */ instr_ld<Register::IYL, Register::E>,
+            /* FD 6C */ instr_ld<Register::IYL, Register::IYH>,
+            /* FD 6D */ instr_ld<Register::IYL, Register::IYL>,
+            /* FD 6E */ instr_ld<Register::L, AddressingMode::IYPlus>,
+            /* FD 6F */ instr_ld<Register::IYL, Register::A>,
+            /* FD 70 */ instr_ld<AddressingMode::IYPlus, Register::B>,
+            /* FD 71 */ instr_ld<AddressingMode::IYPlus, Register::C>,
+            /* FD 72 */ instr_ld<AddressingMode::IYPlus, Register::D>,
+            /* FD 73 */ instr_ld<AddressingMode::IYPlus, Register::E>,
+            /* FD 74 */ instr_ld<AddressingMode::IYPlus, Register::H>,
+            /* FD 75 */ instr_ld<AddressingMode::IYPlus, Register::L>,
             /* FD 76 */ unimplemented_fd_instr<0x76>,
-            /* FD 77 */ unimplemented_fd_instr<0x77>,
+            /* FD 77 */ instr_ld<AddressingMode::IYPlus, Register::A>,
             /* FD 78 */ unimplemented_fd_instr<0x78>,
             /* FD 79 */ unimplemented_fd_instr<0x79>,
             /* FD 7A */ unimplemented_fd_instr<0x7A>,
             /* FD 7B */ unimplemented_fd_instr<0x7B>,
-            /* FD 7C */ unimplemented_fd_instr<0x7C>,
-            /* FD 7D */ unimplemented_fd_instr<0x7D>,
+            /* FD 7C */ instr_ld<Register::A, Register::IYH>,
+            /* FD 7D */ instr_ld<Register::A, Register::IYL>,
             /* FD 7E */ instr_ld<Register::A, AddressingMode::IYPlus>,
             /* FD 7F */ unimplemented_fd_instr<0x7F>,
             /* FD 80 */ unimplemented_fd_instr<0x80>,
@@ -1805,7 +2564,7 @@ namespace Z80 {
             /* FD 83 */ unimplemented_fd_instr<0x83>,
             /* FD 84 */ instr_add<Register::A, Register::IYH>,
             /* FD 85 */ instr_add<Register::A, Register::IYL>,
-            /* FD 86 */ unimplemented_fd_instr<0x86>,
+            /* FD 86 */ instr_add<Register::A, AddressingMode::IYPlus>,
             /* FD 87 */ unimplemented_fd_instr<0x87>,
             /* FD 88 */ unimplemented_fd_instr<0x88>,
             /* FD 89 */ unimplemented_fd_instr<0x89>,
@@ -1813,55 +2572,55 @@ namespace Z80 {
             /* FD 8B */ unimplemented_fd_instr<0x8B>,
             /* FD 8C */ instr_adc<Register::A, Register::IYH>,
             /* FD 8D */ instr_adc<Register::A, Register::IYL>,
-            /* FD 8E */ unimplemented_fd_instr<0x8E>,
+            /* FD 8E */ instr_adc<Register::A, AddressingMode::IYPlus>,
             /* FD 8F */ unimplemented_fd_instr<0x8F>,
             /* FD 90 */ unimplemented_fd_instr<0x90>,
             /* FD 91 */ unimplemented_fd_instr<0x91>,
             /* FD 92 */ unimplemented_fd_instr<0x92>,
             /* FD 93 */ unimplemented_fd_instr<0x93>,
-            /* FD 94 */ unimplemented_fd_instr<0x94>,
-            /* FD 95 */ unimplemented_fd_instr<0x95>,
-            /* FD 96 */ unimplemented_fd_instr<0x96>,
+            /* FD 94 */ instr_sub<Register::IYH>,
+            /* FD 95 */ instr_sub<Register::IYL>,
+            /* FD 96 */ instr_sub<AddressingMode::IYPlus>,
             /* FD 97 */ unimplemented_fd_instr<0x97>,
             /* FD 98 */ unimplemented_fd_instr<0x98>,
             /* FD 99 */ unimplemented_fd_instr<0x99>,
             /* FD 9A */ unimplemented_fd_instr<0x9A>,
             /* FD 9B */ unimplemented_fd_instr<0x9B>,
-            /* FD 9C */ unimplemented_fd_instr<0x9C>,
-            /* FD 9D */ unimplemented_fd_instr<0x9D>,
-            /* FD 9E */ unimplemented_fd_instr<0x9E>,
+            /* FD 9C */ instr_sbc<Register::A, Register::IYH>,
+            /* FD 9D */ instr_sbc<Register::A, Register::IYL>,
+            /* FD 9E */ instr_sbc<Register::A, AddressingMode::IYPlus>,
             /* FD 9F */ unimplemented_fd_instr<0x9F>,
             /* FD A0 */ unimplemented_fd_instr<0xA0>,
             /* FD A1 */ unimplemented_fd_instr<0xA1>,
             /* FD A2 */ unimplemented_fd_instr<0xA2>,
             /* FD A3 */ unimplemented_fd_instr<0xA3>,
-            /* FD A4 */ unimplemented_fd_instr<0xA4>,
-            /* FD A5 */ unimplemented_fd_instr<0xA5>,
-            /* FD A6 */ unimplemented_fd_instr<0xA6>,
+            /* FD A4 */ instr_and<Register::IYH>,
+            /* FD A5 */ instr_and<Register::IYL>,
+            /* FD A6 */ instr_and<AddressingMode::IYPlus>,
             /* FD A7 */ unimplemented_fd_instr<0xA7>,
             /* FD A8 */ unimplemented_fd_instr<0xA8>,
             /* FD A9 */ unimplemented_fd_instr<0xA9>,
             /* FD AA */ unimplemented_fd_instr<0xAA>,
             /* FD AB */ unimplemented_fd_instr<0xAB>,
-            /* FD AC */ unimplemented_fd_instr<0xAC>,
-            /* FD AD */ unimplemented_fd_instr<0xAD>,
-            /* FD AE */ unimplemented_fd_instr<0xAE>,
+            /* FD AC */ instr_xor<Register::IYH>,
+            /* FD AD */ instr_xor<Register::IYL>,
+            /* FD AE */ instr_xor<AddressingMode::IYPlus>,
             /* FD AF */ unimplemented_fd_instr<0xAF>,
             /* FD B0 */ unimplemented_fd_instr<0xB0>,
             /* FD B1 */ unimplemented_fd_instr<0xB1>,
             /* FD B2 */ unimplemented_fd_instr<0xB2>,
             /* FD B3 */ unimplemented_fd_instr<0xB3>,
-            /* FD B4 */ unimplemented_fd_instr<0xB4>,
-            /* FD B5 */ unimplemented_fd_instr<0xB5>,
-            /* FD B6 */ unimplemented_fd_instr<0xB6>,
+            /* FD B4 */ instr_or<Register::IYH>,
+            /* FD B5 */ instr_or<Register::IYL>,
+            /* FD B6 */ instr_or<AddressingMode::IYPlus>,
             /* FD B7 */ unimplemented_fd_instr<0xB7>,
             /* FD B8 */ unimplemented_fd_instr<0xB8>,
             /* FD B9 */ unimplemented_fd_instr<0xB9>,
             /* FD BA */ unimplemented_fd_instr<0xBA>,
             /* FD BB */ unimplemented_fd_instr<0xBB>,
-            /* FD BC */ unimplemented_fd_instr<0xBC>,
-            /* FD BD */ unimplemented_fd_instr<0xBD>,
-            /* FD BE */ unimplemented_fd_instr<0xBE>,
+            /* FD BC */ instr_cp<Register::IYH>,
+            /* FD BD */ instr_cp<Register::IYL>,
+            /* FD BE */ instr_cp<AddressingMode::IYPlus>,
             /* FD BF */ unimplemented_fd_instr<0xBF>,
             /* FD C0 */ unimplemented_fd_instr<0xC0>,
             /* FD C1 */ unimplemented_fd_instr<0xC1>,
@@ -1874,7 +2633,7 @@ namespace Z80 {
             /* FD C8 */ unimplemented_fd_instr<0xC8>,
             /* FD C9 */ unimplemented_fd_instr<0xC9>,
             /* FD CA */ unimplemented_fd_instr<0xCA>,
-            /* FD CB */ unimplemented_fd_instr<0xCB>,
+            /* FD CB */ instr_fdcb,
             /* FD CC */ unimplemented_fd_instr<0xCC>,
             /* FD CD */ unimplemented_fd_instr<0xCD>,
             /* FD CE */ unimplemented_fd_instr<0xCE>,
@@ -1927,5 +2686,264 @@ namespace Z80 {
             /* FD FD */ unimplemented_fd_instr<0xFD>,
             /* FD FE */ unimplemented_fd_instr<0xFE>,
             /* FD FF */ unimplemented_fd_instr<0xFF>,
+    };
+
+    const instruction fdcb_instructions[0x100] = {
+            /* FD CB 00 */ instr_rlc<AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 01 */ instr_rlc<AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 02 */ instr_rlc<AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 03 */ instr_rlc<AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 04 */ instr_rlc<AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 05 */ instr_rlc<AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 06 */ instr_rlc<AddressingMode::IYPlusPrevious>,
+            /* FD CB 07 */ instr_rlc<AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 08 */ instr_rrc<AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 09 */ instr_rrc<AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 0A */ instr_rrc<AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 0B */ instr_rrc<AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 0C */ instr_rrc<AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 0D */ instr_rrc<AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 0E */ instr_rrc<AddressingMode::IYPlusPrevious>,
+            /* FD CB 0F */ instr_rrc<AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 10 */ instr_rl<AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 11 */ instr_rl<AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 12 */ instr_rl<AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 13 */ instr_rl<AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 14 */ instr_rl<AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 15 */ instr_rl<AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 16 */ instr_rl<AddressingMode::IYPlusPrevious>,
+            /* FD CB 17 */ instr_rl<AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 18 */ instr_rr<AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 19 */ instr_rr<AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 1A */ instr_rr<AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 1B */ instr_rr<AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 1C */ instr_rr<AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 1D */ instr_rr<AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 1E */ instr_rr<AddressingMode::IYPlusPrevious>,
+            /* FD CB 1F */ instr_rr<AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 20 */ instr_sla<AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 21 */ instr_sla<AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 22 */ instr_sla<AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 23 */ instr_sla<AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 24 */ instr_sla<AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 25 */ instr_sla<AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 26 */ instr_sla<AddressingMode::IYPlusPrevious>,
+            /* FD CB 27 */ instr_sla<AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 28 */ instr_sra<AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 29 */ instr_sra<AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 2A */ instr_sra<AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 2B */ instr_sra<AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 2C */ instr_sra<AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 2D */ instr_sra<AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 2E */ instr_sra<AddressingMode::IYPlusPrevious>,
+            /* FD CB 2F */ instr_sra<AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 30 */ instr_sll<AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 31 */ instr_sll<AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 32 */ instr_sll<AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 33 */ instr_sll<AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 34 */ instr_sll<AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 35 */ instr_sll<AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 36 */ instr_sll<AddressingMode::IYPlusPrevious>,
+            /* FD CB 37 */ instr_sll<AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 38 */ instr_srl<AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 39 */ instr_srl<AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 3A */ instr_srl<AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 3B */ instr_srl<AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 3C */ instr_srl<AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 3D */ instr_srl<AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 3E */ instr_srl<AddressingMode::IYPlusPrevious>,
+            /* FD CB 3F */ instr_srl<AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 40 */ instr_bit<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 41 */ instr_bit<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 42 */ instr_bit<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 43 */ instr_bit<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 44 */ instr_bit<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 45 */ instr_bit<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 46 */ instr_bit<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 47 */ instr_bit<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 48 */ instr_bit<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 49 */ instr_bit<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 4A */ instr_bit<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 4B */ instr_bit<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 4C */ instr_bit<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 4D */ instr_bit<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 4E */ instr_bit<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 4F */ instr_bit<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 50 */ instr_bit<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 51 */ instr_bit<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 52 */ instr_bit<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 53 */ instr_bit<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 54 */ instr_bit<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 55 */ instr_bit<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 56 */ instr_bit<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 57 */ instr_bit<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 58 */ instr_bit<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 59 */ instr_bit<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 5A */ instr_bit<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 5B */ instr_bit<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 5C */ instr_bit<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 5D */ instr_bit<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 5E */ instr_bit<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 5F */ instr_bit<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 60 */ instr_bit<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB 61 */ instr_bit<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB 62 */ instr_bit<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB 63 */ instr_bit<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB 64 */ instr_bit<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB 65 */ instr_bit<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB 66 */ instr_bit<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB 67 */ instr_bit<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB 68 */ instr_bit<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB 69 */ instr_bit<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB 6A */ instr_bit<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB 6B */ instr_bit<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB 6C */ instr_bit<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB 6D */ instr_bit<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB 6E */ instr_bit<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB 6F */ instr_bit<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB 70 */ instr_bit<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB 71 */ instr_bit<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB 72 */ instr_bit<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB 73 */ instr_bit<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB 74 */ instr_bit<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB 75 */ instr_bit<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB 76 */ instr_bit<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB 77 */ instr_bit<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB 78 */ instr_bit<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB 79 */ instr_bit<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB 7A */ instr_bit<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB 7B */ instr_bit<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB 7C */ instr_bit<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB 7D */ instr_bit<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB 7E */ instr_bit<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB 7F */ instr_bit<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB 80 */ instr_res<0, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 81 */ instr_res<0, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 82 */ instr_res<0, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 83 */ instr_res<0, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 84 */ instr_res<0, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 85 */ instr_res<0, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 86 */ instr_res<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB 87 */ instr_res<0, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 88 */ instr_res<1, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 89 */ instr_res<1, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 8A */ instr_res<1, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 8B */ instr_res<1, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 8C */ instr_res<1, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 8D */ instr_res<1, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 8E */ instr_res<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB 8F */ instr_res<1, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 90 */ instr_res<2, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 91 */ instr_res<2, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 92 */ instr_res<2, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 93 */ instr_res<2, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 94 */ instr_res<2, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 95 */ instr_res<2, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 96 */ instr_res<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB 97 */ instr_res<2, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB 98 */ instr_res<3, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB 99 */ instr_res<3, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB 9A */ instr_res<3, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB 9B */ instr_res<3, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB 9C */ instr_res<3, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB 9D */ instr_res<3, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB 9E */ instr_res<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB 9F */ instr_res<3, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB A0 */ instr_res<4, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB A1 */ instr_res<4, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB A2 */ instr_res<4, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB A3 */ instr_res<4, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB A4 */ instr_res<4, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB A5 */ instr_res<4, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB A6 */ instr_res<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB A7 */ instr_res<4, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB A8 */ instr_res<5, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB A9 */ instr_res<5, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB AA */ instr_res<5, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB AB */ instr_res<5, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB AC */ instr_res<5, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB AD */ instr_res<5, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB AE */ instr_res<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB AF */ instr_res<5, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB B0 */ instr_res<6, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB B1 */ instr_res<6, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB B2 */ instr_res<6, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB B3 */ instr_res<6, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB B4 */ instr_res<6, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB B5 */ instr_res<6, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB B6 */ instr_res<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB B7 */ instr_res<6, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB B8 */ instr_res<7, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB B9 */ instr_res<7, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB BA */ instr_res<7, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB BB */ instr_res<7, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB BC */ instr_res<7, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB BD */ instr_res<7, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB BE */ instr_res<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB BF */ instr_res<7, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB C0 */ instr_set<0, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB C1 */ instr_set<0, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB C2 */ instr_set<0, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB C3 */ instr_set<0, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB C4 */ instr_set<0, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB C5 */ instr_set<0, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB C6 */ instr_set<0, AddressingMode::IYPlusPrevious>,
+            /* FD CB C7 */ instr_set<0, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB C8 */ instr_set<1, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB C9 */ instr_set<1, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB CA */ instr_set<1, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB CB */ instr_set<1, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB CC */ instr_set<1, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB CD */ instr_set<1, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB CE */ instr_set<1, AddressingMode::IYPlusPrevious>,
+            /* FD CB CF */ instr_set<1, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB D0 */ instr_set<2, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB D1 */ instr_set<2, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB D2 */ instr_set<2, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB D3 */ instr_set<2, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB D4 */ instr_set<2, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB D5 */ instr_set<2, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB D6 */ instr_set<2, AddressingMode::IYPlusPrevious>,
+            /* FD CB D7 */ instr_set<2, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB D8 */ instr_set<3, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB D9 */ instr_set<3, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB DA */ instr_set<3, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB DB */ instr_set<3, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB DC */ instr_set<3, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB DD */ instr_set<3, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB DE */ instr_set<3, AddressingMode::IYPlusPrevious>,
+            /* FD CB DF */ instr_set<3, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB E0 */ instr_set<4, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB E1 */ instr_set<4, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB E2 */ instr_set<4, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB E3 */ instr_set<4, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB E4 */ instr_set<4, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB E5 */ instr_set<4, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB E6 */ instr_set<4, AddressingMode::IYPlusPrevious>,
+            /* FD CB E7 */ instr_set<4, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB E8 */ instr_set<5, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB E9 */ instr_set<5, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB EA */ instr_set<5, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB EB */ instr_set<5, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB EC */ instr_set<5, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB ED */ instr_set<5, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB EE */ instr_set<5, AddressingMode::IYPlusPrevious>,
+            /* FD CB EF */ instr_set<5, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB F0 */ instr_set<6, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB F1 */ instr_set<6, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB F2 */ instr_set<6, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB F3 */ instr_set<6, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB F4 */ instr_set<6, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB F5 */ instr_set<6, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB F6 */ instr_set<6, AddressingMode::IYPlusPrevious>,
+            /* FD CB F7 */ instr_set<6, AddressingMode::IYPlusPrevious, Register::A>,
+            /* FD CB F8 */ instr_set<7, AddressingMode::IYPlusPrevious, Register::B>,
+            /* FD CB F9 */ instr_set<7, AddressingMode::IYPlusPrevious, Register::C>,
+            /* FD CB FA */ instr_set<7, AddressingMode::IYPlusPrevious, Register::D>,
+            /* FD CB FB */ instr_set<7, AddressingMode::IYPlusPrevious, Register::E>,
+            /* FD CB FC */ instr_set<7, AddressingMode::IYPlusPrevious, Register::H>,
+            /* FD CB FD */ instr_set<7, AddressingMode::IYPlusPrevious, Register::L>,
+            /* FD CB FE */ instr_set<7, AddressingMode::IYPlusPrevious>,
+            /* FD CB FF */ instr_set<7, AddressingMode::IYPlusPrevious, Register::A>
     };
 }

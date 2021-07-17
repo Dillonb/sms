@@ -29,8 +29,8 @@ namespace Z80 {
         u16 pc;
         u16 sp;
         u8 i;
-        u16 ix;
-        u16 iy;
+        Util::Bitfield<WideRegister> ix;
+        Util::Bitfield<WideRegister> iy;
 
         // Shadow registers
         u16 af_, bc_, de_, hl_;

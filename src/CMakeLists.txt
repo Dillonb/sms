@@ -7,5 +7,8 @@ add_executable(sms main.cpp util/bitfield.h
         mem/bios.cpp mem/bios.h
         mem/mem.cpp mem/mem.h
         vdp/vdp.cpp vdp/vdp.h
-        vdp/vdp_register.cpp vdp/vdp_register.h)
+        vdp/vdp_register.cpp
+        vdp/vdp_register.h
+        vdp/sdl_render.cpp vdp/sdl_render.h)
+target_link_libraries(sms SDL2)
 target_link_libraries(sms z80 util)

@@ -1,3 +1,4 @@
+#include <vdp/sdl_render.h>
 #include "mem/rom.h"
 #include "mem/bus.h"
 #include "mem/bios.h"
@@ -18,6 +19,8 @@ int main(int argc, char** argv) {
         logalways("No bios found.");
     }
     Z80::set_pc(0);
+
+    Vdp::render_init();
 
     while (1) {
         if (Vdp::interrupt_pending()) {

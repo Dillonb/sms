@@ -1,6 +1,8 @@
 #include <util/log.h>
+#include <cassert>
 #include "vdp.h"
 #include "vdp_register.h"
+#include "sdl_render.h"
 
 namespace Vdp {
     bool ctrl_high = false;
@@ -10,6 +12,8 @@ namespace Vdp {
 
     u8 vram[0x4000];
     u8 cram[32];
+
+    u8 screen[256][256];
 
     int cycle_counter = 0;
     int hcounter = 0;
@@ -88,14 +92,68 @@ namespace Vdp {
         }
     }
 
+    void render_scanline_mode4(unsigned int line) {
+        // Tiles are 8x8, divide our line by 8 to get our y offset into the nametable
+        unsigned int tile_y = line / 8;
+
+        assert(tile_y < 32);
+
+        constexpr u16 nametable_base = 0x3800;
+
+        // --bbb yyyyy xxxxx w
+        u16 nametable_address = nametable_base | (tile_y << 6);
+
+        for (unsigned int tile_x = 0; tile_x < 32; tile_x++) {
+            u16 addr  = nametable_address | (tile_x << 1);
+
+
+            u16 entry = vram[addr] | ((u16)vram[addr + 1] << 8);
+
+            // pcvhnnnnnnnnn
+
+            u16 pattern_index = (entry & 0x1FF) + ((line % 8) * 4);
+            bool hflip = (entry >> 9) & 1;
+            //bool vflip = (entry >> 10) & 1;
+            int palette = (entry >> 11) & 1;
+            if (palette != 0) {
+                logfatal("aaaa");
+            }
+            //bool priority = (entry >> 12) & 1;
+
+            u8 bp[] {
+                    vram[pattern_index + 0],
+                    vram[pattern_index + 1],
+                    vram[pattern_index + 2],
+                    vram[pattern_index + 3],
+            };
+
+            int start = hflip ? 0 : 7;
+            int end = hflip ? 7 : 0;
+            int direction = hflip ? 1 : -1;
+
+            for (int pixel = start; pixel != end; pixel += direction) {
+                u8 color_index = 0;
+                for (int bpindex = 0; bpindex < 4; bpindex++) {
+                    color_index |= ((bp[bpindex] >> pixel) & 1) << bpindex;
+                }
+                screen[line][tile_x * 8 + pixel] = cram[color_index];
+            }
+        }
+    }
+
+
     void scanline() {
         switch (mode.raw) {
             case 0b1010:
-                printf("Mode 4.\n");
+                printf("Mode 4. If you see this more than once, implement me!\n");
                 break;
             case 0b1011:
+                if (vcounter <= 192) {
+                    render_scanline_mode4(vcounter);
+                }
                 // TODO does this happen at 224 or 225?
-                if (vcounter == 225 && vdpModeControl1[VdpModeControl2::FrameInterruptEnable]) {
+                if (vcounter == 224 && vdpModeControl1[VdpModeControl2::FrameInterruptEnable]) {
+                    render_frame();
                     frame_interrupt = true;
                 }
                 break;

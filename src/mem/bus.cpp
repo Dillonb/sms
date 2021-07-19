@@ -1,4 +1,5 @@
 #include <util/log.h>
+#include <vdp/vdp.h>
 #include "bus.h"
 #include "bios.h"
 #include "mem.h"
@@ -35,11 +36,13 @@ namespace Bus {
 
     void port_out(u8 port, u8 value) {
         switch (port) {
-            case 0x40 ... 0x7F:
-                logwarn("PSG port written, ignoring!");
+            case 0x40 ... 0x7F: // PSG ports, ignored for now
                 break;
-            case 0x80 ... 0xBF:
-                logwarn("VDP register written, ignoring!");
+            case 0xBE:
+                Vdp::write_data(value);
+                break;
+            case 0xBF:
+                Vdp::write_control(value);
                 break;
             default:
                 logfatal("Unsupported port: 0x%02X", port);
@@ -50,6 +53,14 @@ namespace Bus {
         switch (port) {
             case 0x40 ... 0x7F:
                 logfatal("Read from either VCounter or HCounter!");
+            case 0x80 ... 0xBF:
+                if (port & 1) { // Odd port - VDP status
+                    return Vdp::get_status();
+                } else { // Even port - VDP data port
+                    logfatal("Unsupported port: 0x%02X (VDP data port)", port);
+                }
+            case 0xDC: // controller data
+                return 0xFF;
             default:
                 logfatal("Unsupported port: 0x%02X", port);
         }

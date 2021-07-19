@@ -22,6 +22,9 @@ namespace Z80 {
 
         int interrupt_mode;
 
+        bool interrupts_enabled;
+        bool next_interrupts_enabled;
+
         u8 a;
         FlagRegister f;
 
@@ -48,6 +51,8 @@ namespace Z80 {
     void set_port_handlers(port_in_handler in_handler, port_out_handler out_handler);
 
     void set_pc(u16 address);
+
+    void raise_interrupt();
 
     int step();
 }

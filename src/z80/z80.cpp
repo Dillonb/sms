@@ -6,6 +6,7 @@
 #include "util/log.h"
 
 #include "instructions.h"
+#include "util.h"
 
 namespace Z80 {
     z80_t z80;
@@ -35,6 +36,8 @@ namespace Z80 {
         u16 address = z80.pc;
         u8 opcode = z80.read_byte(z80.pc++);
 
+        z80.interrupts_enabled = z80.next_interrupts_enabled;
+
         logdebug("[%04X] %02X %02X %02X %02X", address, opcode, z80.read_byte(z80.pc), z80.read_byte(z80.pc + 1), z80.read_byte(z80.pc + 2));
         logtrace("AF: %02X%02X BC: %04X DE: %04X HL: %04X", z80.a, z80.f.assemble(), z80.bc.raw, z80.de.raw, z80.hl.raw);
         logtrace("SZ5H3PVNC");
@@ -42,5 +45,20 @@ namespace Z80 {
 
         int cycles = instructions[opcode]();
         return cycles;
+    }
+
+    void raise_interrupt() {
+        if (z80.interrupts_enabled) {
+            z80.interrupts_enabled = false;
+            z80.next_interrupts_enabled = false;
+            switch (z80.interrupt_mode) {
+                case 1:
+                    stack_push<u16>(z80.pc);
+                    z80.pc = 0x0038;
+                    break;
+                default:
+                    logfatal("Interrupt raised. Mode: %d", z80.interrupt_mode);
+            }
+        }
     }
 }

@@ -78,13 +78,8 @@ namespace Vdp {
             case COMMAND_VRAM_WRITE:
                 vram[address] = value;
                 address = (address + 1) & 0x3FFF;
-                logalways("VRAM %04X = %02X", address, value);
                 break;
             case COMMAND_CRAM_WRITE:
-                if (address >= 32) {
-                    logfatal("Out of range CRAM write");
-                }
-                logalways("CRAM %04X = %02X", address, value);
                 cram[address] = value & 0x3F;
                 address = (address + 1) & 0x3FFF;
                 break;

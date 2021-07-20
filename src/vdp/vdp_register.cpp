@@ -21,13 +21,11 @@ namespace Vdp {
                 vdpModeControl1.raw = value;
                 mode(Mode::M2) = vdpModeControl1[VdpModeControl1::M2];
                 mode(Mode::M4) = vdpModeControl1[VdpModeControl1::M4];
-                logalways("Line interrupt enabled? %d", vdpModeControl1[VdpModeControl1::LineInterruptEnable]);
                 break;
             case 1:
                 vdpModeControl2.raw = value;
                 mode(Mode::M1) = vdpModeControl1[VdpModeControl2::M1];
                 mode(Mode::M3) = vdpModeControl1[VdpModeControl2::M3];
-                logalways("Frame interrupt enabled? %d", vdpModeControl2[VdpModeControl2::FrameInterruptEnable]);
                 break;
             case 2:
                 if (value != 0xFF) {

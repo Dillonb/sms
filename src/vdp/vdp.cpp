@@ -40,13 +40,16 @@ namespace Vdp {
         for (int i = 0; i < 0x4000; i++) {
             vram[i] = 0;
         }
+
+        for (int i = 0; i < 32; i++) {
+            cram[i] = 0;
+        }
     }
 
     void process_command() {
         switch (code) {
             case COMMAND_VRAM_READ:
                 read_buffer = vram[address];
-                logalways("copy 1 byte from vram[address] to the \"read buffer\"");
                 address++;
                 break;
             case COMMAND_VRAM_WRITE: // Handled in the write_data() function below
@@ -95,6 +98,7 @@ namespace Vdp {
     void render_scanline_mode4(unsigned int line) {
         // Tiles are 8x8, divide our line by 8 to get our y offset into the nametable
         unsigned int tile_y = line / 8;
+        unsigned int intile_y = line % 8;
 
         assert(tile_y < 32);
 
@@ -111,12 +115,15 @@ namespace Vdp {
 
             // pcvhnnnnnnnnn
 
-            u16 pattern_index = (entry & 0x1FF) + ((line % 8) * 4);
+            u16 pattern_index = ((entry & 0x1FF) * 32) + (intile_y * 4);
             bool hflip = (entry >> 9) & 1;
-            //bool vflip = (entry >> 10) & 1;
+            bool vflip = (entry >> 10) & 1;
+            if (vflip) {
+                logfatal("vflip!");
+            }
             int palette = (entry >> 11) & 1;
             if (palette != 0) {
-                logfatal("aaaa");
+                logfatal("Second palette selected");
             }
             //bool priority = (entry >> 12) & 1;
 
@@ -127,14 +134,15 @@ namespace Vdp {
                     vram[pattern_index + 3],
             };
 
-            int start = hflip ? 0 : 7;
-            int end = hflip ? 7 : 0;
-            int direction = hflip ? 1 : -1;
+            for (int pixel = 0; pixel < 8; pixel++) {
+                int bit = hflip ? pixel : 7 - pixel;
 
-            for (int pixel = start; pixel != end; pixel += direction) {
                 u8 color_index = 0;
                 for (int bpindex = 0; bpindex < 4; bpindex++) {
-                    color_index |= ((bp[bpindex] >> pixel) & 1) << bpindex;
+                    color_index |= ((bp[bpindex] >> bit) & 1) << bpindex;
+                }
+                if (color_index > 32) {
+                    logfatal("Color index %d too beeg", color_index);
                 }
                 screen[line][tile_x * 8 + pixel] = cram[color_index];
             }
@@ -145,8 +153,8 @@ namespace Vdp {
     void scanline() {
         switch (mode.raw) {
             case 0b1010:
-                printf("Mode 4. If you see this more than once, implement me!\n");
-                break;
+                //printf("Mode 4. If you see this more than once, implement me!\n");
+                //break;
             case 0b1011:
                 if (vcounter <= 192) {
                     render_scanline_mode4(vcounter);
@@ -171,7 +179,7 @@ namespace Vdp {
         vcounter = (vcounter + 1) % num_scanlines;
     }
 
-    void step(int cycles) {
+    void step(unsigned int cycles) {
         cycle_counter += cycles;
         if (cycle_counter >= cycles_per_line) {
             cycle_counter -= cycles_per_line;

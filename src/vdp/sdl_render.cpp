@@ -24,7 +24,7 @@ namespace Vdp {
                                   SMS_SCREEN_Y * SCREEN_SCALE,
                                   SDL_WINDOW_SHOWN);
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-        buffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB32, SDL_TEXTUREACCESS_STREAMING, SMS_SCREEN_X, SMS_SCREEN_Y);
+        buffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SMS_SCREEN_X, SMS_SCREEN_Y);
         SDL_RenderSetScale(renderer, SCREEN_SCALE, SCREEN_SCALE);
     }
 
@@ -42,16 +42,16 @@ namespace Vdp {
 
     //  --BBGGRR
     inline u32 smscolor_to_sdlcolor(u8 color) {
-        return (convert_color_channel(color >> 0) << 24)
-               | (convert_color_channel(color >> 2) << 16)
-               | (convert_color_channel(color >> 4) << 8);
+        u32 red = convert_color_channel(color >> 0);
+        u32 green = convert_color_channel(color >> 2);
+        u32 blue = convert_color_channel(color >> 4);
+        return (red << 24) | (green << 16) | (blue << 8);
     }
 
     void render_frame() {
         for (int x = 0; x < SMS_SCREEN_X; x++) {
             for (int y = 0; y < SMS_SCREEN_Y; y++) {
-                // Note these arrays are indexed in the opposite way
-                fullcolor_screen[y][x] = smscolor_to_sdlcolor(screen[x][y]);
+                fullcolor_screen[y][x] = smscolor_to_sdlcolor(screen[y][x]);
             }
         }
         SDL_UpdateTexture(buffer, nullptr, screen, SMS_SCREEN_X * 4);

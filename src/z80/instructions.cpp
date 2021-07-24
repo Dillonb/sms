@@ -891,8 +891,35 @@ namespace Z80 {
         return 4;
     }
 
-    int instr_cpd() {
-        logfatal("instr_cpd");
+    template<int hl_increment>
+    inline int instr_cpd_cpi() {
+        u8 s = read_value<AddressingMode::HL, u8>();
+        u8 r = z80.a - s;
+
+        z80.f.s = ((s8)r) < 0;
+        z80.f.z = r == 0;
+        z80.f.h = (s & 0xF) > (z80.a & 0xF); // overflow on lower half of reg
+        z80.f.n = true;
+
+        z80.f.b3 = ((r - z80.f.h) >> 3) & 1;
+        z80.f.b5 = ((r - z80.f.h) >> 1) & 1;
+
+        z80.hl.raw += hl_increment;
+        z80.bc.raw--;
+
+        z80.f.p_v = z80.bc.raw != 0;
+
+        return 16;
+    }
+
+    template<int hl_increment>
+    int instr_cpdr_cpir() {
+        int cycles = instr_cpd_cpi<hl_increment>();
+        if (get_register<Register::BC>() != 0 && !z80.f.z) {
+            z80.pc -= 2;
+            cycles += 5;
+        }
+        return cycles;
     }
 
     template <AddressingMode port, Register value>
@@ -2482,7 +2509,7 @@ namespace Z80 {
             /* ED 9E */ unimplemented_ed_instr<0x9E>,
             /* ED 9F */ unimplemented_ed_instr<0x9F>,
             /* ED A0 */ instr_ldi,
-            /* ED A1 */ unimplemented_ed_instr<0xA1>,
+            /* ED A1 */ instr_cpd_cpi<1>,
             /* ED A2 */ unimplemented_ed_instr<0xA2>,
             /* ED A3 */ instr_outi,
             /* ED A4 */ unimplemented_ed_instr<0xA4>,
@@ -2490,7 +2517,7 @@ namespace Z80 {
             /* ED A6 */ unimplemented_ed_instr<0xA6>,
             /* ED A7 */ unimplemented_ed_instr<0xA7>,
             /* ED A8 */ unimplemented_ed_instr<0xA8>,
-            /* ED A9 */ instr_cpd,
+            /* ED A9 */ instr_cpd_cpi<-1>,
             /* ED AA */ unimplemented_ed_instr<0xAA>,
             /* ED AB */ unimplemented_ed_instr<0xAB>,
             /* ED AC */ unimplemented_ed_instr<0xAC>,
@@ -2498,7 +2525,7 @@ namespace Z80 {
             /* ED AE */ unimplemented_ed_instr<0xAE>,
             /* ED AF */ unimplemented_ed_instr<0xAF>,
             /* ED B0 */ instr_ldir,
-            /* ED B1 */ unimplemented_ed_instr<0xB1>,
+            /* ED B1 */ instr_cpdr_cpir<1>,
             /* ED B2 */ unimplemented_ed_instr<0xB2>,
             /* ED B3 */ instr_otir,
             /* ED B4 */ unimplemented_ed_instr<0xB4>,
@@ -2506,7 +2533,7 @@ namespace Z80 {
             /* ED B6 */ unimplemented_ed_instr<0xB6>,
             /* ED B7 */ unimplemented_ed_instr<0xB7>,
             /* ED B8 */ unimplemented_ed_instr<0xB8>,
-            /* ED B9 */ unimplemented_ed_instr<0xB9>,
+            /* ED B9 */ instr_cpdr_cpir<-1>,
             /* ED BA */ unimplemented_ed_instr<0xBA>,
             /* ED BB */ unimplemented_ed_instr<0xBB>,
             /* ED BC */ unimplemented_ed_instr<0xBC>,

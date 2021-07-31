@@ -70,6 +70,8 @@ namespace Z80 {
         IYH,
         IYL,
 
+        R,
+
         SP,
     };
 
@@ -108,6 +110,7 @@ namespace Z80 {
     template<> struct reg_type<Register::IYH> { using type = u8; };
     template<> struct reg_type<Register::IYL> { using type = u8; };
 
+    template<> struct reg_type<Register::R> { using type = u8; };
 
     template<> struct reg_type<Register::SP> { using type = u16; };
 

@@ -43,6 +43,11 @@ namespace Z80 {
         logtrace("SZ5H3PVNC");
         logtrace("%d%d%d%d%d %d%d%d", z80.f.s, z80.f.z, z80.f.b5, z80.f.h, z80.f.b3, z80.f.p_v, z80.f.n, z80.f.c);
 
+        z80.instructions++;
+
+        u8 r_hi = z80.r & 0x80;
+        z80.r = r_hi | ((z80.r + 1) & 0x7F);
+
         int cycles = instructions[opcode]();
         return cycles;
     }

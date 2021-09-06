@@ -470,8 +470,9 @@ namespace Z80 {
 
     template <AddressingMode dst, AddressingMode src>
     int instr_ld() {
+        u16 dst_addr = get_address<dst>(); // Need to get the dst address first, to handle cases like ld (ix+*),*
         u8 val = read_value<src, u8>();
-        write_value<dst, u8>(val);
+        z80.write_byte(dst_addr, val);
 
         return 10;
     }
@@ -1942,7 +1943,7 @@ namespace Z80 {
             /* DD 33 */ unimplemented_dd_instr<0x33>,
             /* DD 34 */ instr_inc<AddressingMode::IXPlus>,
             /* DD 35 */ instr_dec<AddressingMode::IXPlus>,
-            /* DD 36 */ unimplemented_dd_instr<0x36>,
+            /* DD 36 */ instr_ld<AddressingMode::IXPlus, AddressingMode::Immediate>,
             /* DD 37 */ unimplemented_dd_instr<0x37>,
             /* DD 38 */ unimplemented_dd_instr<0x38>,
             /* DD 39 */ instr_add<Register::IX, Register::SP>,
@@ -1972,10 +1973,10 @@ namespace Z80 {
             /* DD 51 */ unimplemented_dd_instr<0x51>,
             /* DD 52 */ unimplemented_dd_instr<0x52>,
             /* DD 53 */ unimplemented_dd_instr<0x53>,
-            /* DD 54 */ unimplemented_dd_instr<0x54>,
-            /* DD 55 */ instr_ld<Register::D, Register::IXH>,
-            /* DD 56 */ instr_ld<Register::D, Register::IXL>,
-            /* DD 57 */ instr_ld<Register::D, AddressingMode::IXPlus>,
+            /* DD 54 */ instr_ld<Register::D, Register::IXH>,
+            /* DD 55 */ instr_ld<Register::D, Register::IXL>,
+            /* DD 56 */ instr_ld<Register::D, AddressingMode::IXPlus>,
+            /* DD 57 */ unimplemented_dd_instr<0x57>,
             /* DD 58 */ unimplemented_dd_instr<0x58>,
             /* DD 59 */ unimplemented_dd_instr<0x59>,
             /* DD 5A */ unimplemented_dd_instr<0x5A>,
@@ -2655,7 +2656,7 @@ namespace Z80 {
             /* FD 33 */ unimplemented_fd_instr<0x33>,
             /* FD 34 */ instr_inc<AddressingMode::IYPlus>,
             /* FD 35 */ instr_dec<AddressingMode::IYPlus>,
-            /* FD 36 */ unimplemented_fd_instr<0x36>,
+            /* FD 36 */ instr_ld<AddressingMode::IYPlus, AddressingMode::Immediate>,
             /* FD 37 */ unimplemented_fd_instr<0x37>,
             /* FD 38 */ unimplemented_fd_instr<0x38>,
             /* FD 39 */ instr_add<Register::IY, Register::SP>,
@@ -2685,10 +2686,10 @@ namespace Z80 {
             /* FD 51 */ unimplemented_fd_instr<0x51>,
             /* FD 52 */ unimplemented_fd_instr<0x52>,
             /* FD 53 */ unimplemented_fd_instr<0x53>,
-            /* FD 54 */ unimplemented_fd_instr<0x54>,
-            /* FD 55 */ instr_ld<Register::D, Register::IYH>,
-            /* FD 56 */ instr_ld<Register::D, Register::IYL>,
-            /* FD 57 */ instr_ld<Register::D, AddressingMode::IYPlus>,
+            /* FD 54 */ instr_ld<Register::D, Register::IYH>,
+            /* FD 55 */ instr_ld<Register::D, Register::IYL>,
+            /* FD 56 */ instr_ld<Register::D, AddressingMode::IYPlus>,
+            /* FD 57 */ unimplemented_fd_instr<0x57>,
             /* FD 58 */ unimplemented_fd_instr<0x58>,
             /* FD 59 */ unimplemented_fd_instr<0x59>,
             /* FD 5A */ unimplemented_fd_instr<0x5A>,

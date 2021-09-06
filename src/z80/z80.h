@@ -37,11 +37,15 @@ namespace Z80 {
         Util::Bitfield<WideRegister> ix;
         Util::Bitfield<WideRegister> iy;
 
+        u8 r;
+
         // Shadow registers
         u16 af_, bc_, de_, hl_;
 
         // for DDCB and FDCB
         s8 prev_immediate;
+
+        long instructions;
     } z80_t;
 
     extern z80_t z80;

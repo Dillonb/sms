@@ -1023,6 +1023,36 @@ namespace Z80 {
         return 16;
     }
 
+
+    int instr_ldd() {
+        u8 value = z80.read_byte(z80.hl.raw);
+        z80.write_byte(z80.de.raw, value);
+        z80.hl.raw--;
+        z80.de.raw--;
+        z80.bc.raw--;
+
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.p_v = z80.bc.raw > 0;
+
+        u8 r = value + z80.a;
+
+        z80.f.b3 = ((r >> 3) & 1) == 1;
+        z80.f.b5 = ((r >> 1) & 1) == 1;
+
+        return 16;
+    }
+
+    int instr_lddr() {
+        instr_ldd();
+
+        if (z80.bc.raw) {
+            z80.pc -= 2; // Repeat the instruction until BC is zero
+            return 21;
+        }
+        return 16;
+    }
+
     int instr_rla() {
         bool new_carry = (z80.a >> 7) & 1;
         z80.a <<= 1;
@@ -2575,7 +2605,7 @@ namespace Z80 {
             /* ED A5 */ unimplemented_ed_instr<0xA5>,
             /* ED A6 */ unimplemented_ed_instr<0xA6>,
             /* ED A7 */ unimplemented_ed_instr<0xA7>,
-            /* ED A8 */ unimplemented_ed_instr<0xA8>,
+            /* ED A8 */ instr_ldd,
             /* ED A9 */ instr_cpd_cpi<-1>,
             /* ED AA */ unimplemented_ed_instr<0xAA>,
             /* ED AB */ unimplemented_ed_instr<0xAB>,
@@ -2591,7 +2621,7 @@ namespace Z80 {
             /* ED B5 */ unimplemented_ed_instr<0xB5>,
             /* ED B6 */ unimplemented_ed_instr<0xB6>,
             /* ED B7 */ unimplemented_ed_instr<0xB7>,
-            /* ED B8 */ unimplemented_ed_instr<0xB8>,
+            /* ED B8 */ instr_lddr,
             /* ED B9 */ instr_cpdr_cpir<-1>,
             /* ED BA */ unimplemented_ed_instr<0xBA>,
             /* ED BB */ unimplemented_ed_instr<0xBB>,

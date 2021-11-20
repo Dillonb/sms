@@ -83,11 +83,11 @@ namespace Vdp {
         switch (code) {
             case COMMAND_REGISTER_WRITE:
             case COMMAND_VRAM_WRITE:
-                vram[address] = value;
+                vram[address & 0x3FFF] = value;
                 address = (address + 1) & 0x3FFF;
                 break;
             case COMMAND_CRAM_WRITE:
-                cram[address] = value & 0x3F;
+                cram[address & 0x1F] = value & 0x3F;
                 address = (address + 1) & 0x3FFF;
                 break;
             default:

@@ -1236,19 +1236,42 @@ namespace Z80 {
         return 8;
     }
 
+    inline u8 instr_rr(u8 val) {
+        const bool old_c = z80.f.c;
+        z80.f.c = val & 1;
+        val = (val >> 1) | ((u8)old_c << 7);
+        z80.f.s = ((s8)val) < 0;
+        z80.f.z = val == 0;
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.p_v = parity(val);
+        z80.f.b3 = (val >> 3) & 1;
+        z80.f.b5 = (val >> 5) & 1;
+        return val;
+    }
+
     template<AddressingMode src, Register dst>
     int instr_rr() {
-        logfatal("rr");
+        u16 address = get_address<src>();
+        u8 val = instr_rr(z80.read_byte(address));
+        z80.write_byte(address, val);
+        set_register<dst>(val);
+        return 23;
     }
 
     template<AddressingMode src>
     int instr_rr() {
-        logfatal("rr");
+        u16 address = get_address<src>();
+        u8 val = instr_rr(z80.read_byte(address));
+        z80.write_byte(address, val);
+        return 15;
     }
 
     template<Register src>
     int instr_rr() {
-        logfatal("rr");
+        u8 val = instr_rr(get_register<src>());
+        set_register<src>(val);
+        return 8;
     }
 
     template<AddressingMode src, Register dst>

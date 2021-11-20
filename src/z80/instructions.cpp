@@ -1274,77 +1274,151 @@ namespace Z80 {
         return 8;
     }
 
-    template<AddressingMode src, Register dst>
-    int instr_sla() {
-        logfatal("instr_sla");
-    }
-
-    template<AddressingMode src>
-    int instr_sla() {
-        logfatal("instr_sla");
-    }
-
-    template<Register src>
-    int instr_sla() {
-        logfatal("instr_sla");
-    }
-
-    template<AddressingMode src, Register dst>
-    int instr_sra() {
-        logfatal("instr_sra");
-    }
-
-    template<AddressingMode src>
-    int instr_sra() {
-        logfatal("instr_sra");
-    }
-
-    template<Register src>
-    int instr_sra() {
-        logfatal("instr_sra");
-    }
-
-    template<AddressingMode src, Register dst>
-    int instr_sll() {
-        logfatal("instr_sll");
-    }
-
-    template<AddressingMode src>
-    int instr_sll() {
-        logfatal("instr_sll");
-    }
-
-    template<Register src>
-    int instr_sll() {
-        logfatal("instr_sll");
-    }
-
-    template<AddressingMode src, Register dst>
-    int instr_srl() {
-        logfatal("instr_srl");
-    }
-
-    template<AddressingMode src>
-    int instr_srl() {
-        logfatal("instr_srl");
-    }
-
-    template<Register src>
-    int instr_srl() {
-        u8 value = get_register<src>();
-        u8 res = value >> 1;
-        set_register<src>(res);
-
-        z80.f.c = value & 1;
+    inline u8 instr_sla(u8 val) {
+        z80.f.c = val >> 7;
+        val <<= 1;
+        z80.f.s = ((s8)val) < 0;
+        z80.f.z = val == 0;
         z80.f.n = false;
-        z80.f.p_v = parity(res);
         z80.f.h = false;
-        z80.f.s = ((s8)res) < 0;
-        z80.f.z = res == 0;
+        z80.f.p_v = parity(val);
+        z80.f.b3 = (val >> 3) & 1;
+        z80.f.b5 = (val >> 5) & 1;
+        return val;
+    }
 
-        z80.f.b5 = (res >> 5) & 1;
-        z80.f.b3 = (res >> 3) & 1;
+    template<AddressingMode src, Register dst>
+    int instr_sla() {
+        u16 address = get_address<src>();
+        u8 val = instr_sla(z80.read_byte(address));
+        z80.write_byte(address, val);
+        set_register<dst>(val);
+        return 23;
+    }
 
+    template<AddressingMode src>
+    int instr_sla() {
+        u16 address = get_address<src>();
+        u8 val = instr_sla(z80.read_byte(address));
+        z80.write_byte(address, val);
+        return 15;
+    }
+
+    template<Register src>
+    int instr_sla() {
+        u8 val = instr_sla(get_register<src>());
+        set_register<src>(val);
+        return 8;
+    }
+
+    inline u8 instr_sra(u8 val) {
+        z80.f.c = val & 1;
+        val = ((s8)val >> 1);
+        z80.f.s = ((s8)val) < 0;
+        z80.f.z = val == 0;
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.p_v = parity(val);
+        z80.f.b3 = (val >> 3) & 1;
+        z80.f.b5 = (val >> 5) & 1;
+        return val;
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_sra() {
+        u16 address = get_address<src>();
+        u8 val = instr_sra(z80.read_byte(address));
+        z80.write_byte(address, val);
+        set_register<dst>(val);
+        return 23;
+    }
+
+    template<AddressingMode src>
+    int instr_sra() {
+        u16 address = get_address<src>();
+        u8 val = instr_sra(z80.read_byte(address));
+        z80.write_byte(address, val);
+        return 15;
+    }
+
+    template<Register src>
+    int instr_sra() {
+        u8 val = instr_sra(get_register<src>());
+        set_register<src>(val);
+        return 8;
+    }
+
+    inline uint8_t instr_sll(u8 val) {
+        z80.f.c = val >> 7;
+        val <<= 1;
+        z80.f.s = ((s8)val) < 0;
+        z80.f.z = val == 0;
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.p_v = parity(val);
+        z80.f.b3 = (val >> 3) & 1;
+        z80.f.b5 = (val >> 5) & 1;
+        return val;
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_sll() {
+        u16 address = get_address<src>();
+        u8 val = instr_sll(z80.read_byte(address));
+        z80.write_byte(address, val);
+        set_register<dst>(val);
+        return 23;
+    }
+
+    template<AddressingMode src>
+    int instr_sll() {
+        u16 address = get_address<src>();
+        u8 val = instr_sll(z80.read_byte(address));
+        z80.write_byte(address, val);
+        return 15;
+    }
+
+    template<Register src>
+    int instr_sll() {
+        u8 val = instr_sll(get_register<src>());
+        set_register<src>(val);
+        return 8;
+    }
+
+    inline uint8_t instr_srl(u8 val) {
+        z80.f.c = val & 1;
+        val >>= 1;
+        z80.f.s = ((s8)val) < 0;
+        z80.f.z = val == 0;
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.p_v = parity(val);
+        z80.f.b3 = (val >> 3) & 1;
+        z80.f.b5 = (val >> 5) & 1;
+        return val;
+    }
+
+    template<AddressingMode src, Register dst>
+    int instr_srl() {
+        u16 address = get_address<src>();
+        u8 val = instr_srl(z80.read_byte(address));
+        z80.write_byte(address, val);
+        set_register<dst>(val);
+        return 23;
+    }
+
+    template<AddressingMode src>
+    int instr_srl() {
+        u16 address = get_address<src>();
+        u8 val = instr_srl(z80.read_byte(address));
+        z80.write_byte(address, val);
+        return 15;
+    }
+
+    template<Register src>
+    int instr_srl() {
+        u8 val = instr_sll(get_register<src>());
+        set_register<src>(val);
         return 8;
     }
 

@@ -1115,7 +1115,7 @@ namespace Z80 {
 
         set_register<dst>(res);
         z80.write_byte(address, res);
-        z80.f.s = res & 1;
+        z80.f.s = ((s8)res) < 0;
         z80.f.z = res == 0;
         z80.f.p_v = parity(res);
         z80.f.n = false;
@@ -1131,7 +1131,7 @@ namespace Z80 {
         u8 value = get_register<src>();
         u8 res = std::rotl(value, 1);
         set_register<src>(res);
-        z80.f.s = res & 1;
+        z80.f.s = ((s8)res) < 0;
         z80.f.z = res == 0;
         z80.f.p_v = parity(res);
         z80.f.n = false;
@@ -1144,22 +1144,57 @@ namespace Z80 {
 
     template<AddressingMode src>
     int instr_rlc() {
-        logfatal("rlc");
+        u16 address = get_address<src>();
+        u8 value = z80.read_byte(address);
+        u8 res = std::rotl(value, 1);
+
+        z80.write_byte(address, res);
+        z80.f.s = ((s8)res) < 0;
+        z80.f.z = res == 0;
+        z80.f.p_v = parity(res);
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.c = res & 1;
+        z80.f.b3 = (res >> 3) & 1;
+        z80.f.b5 = (res >> 5) & 1;
+        return 23;
+    }
+
+    u8 instr_rrc(u8 val) {
+        z80.f.c = val & 1;
+        val = (val >> 1) | ((u8)z80.f.c << 7);
+        z80.f.s = val >> 7;
+        z80.f.z = val == 0;
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.p_v = parity(val);
+        z80.f.b3 = (val >> 3) & 1;
+        z80.f.b5 = (val >> 5) & 1;
+        return val;
     }
 
     template<AddressingMode src, Register dst>
     int instr_rrc() {
-        logfatal("rrc");
+        u16 address = get_address<src>();
+        u8 val = instr_rrc(z80.read_byte(address));
+        z80.write_byte(address, val);
+        set_register<dst>(val);
+        return 23;
     }
 
     template<AddressingMode src>
     int instr_rrc() {
-        logfatal("rrc");
+        u16 address = get_address<src>();
+        u8 val = instr_rrc(z80.read_byte(address));
+        z80.write_byte(address, val);
+        return 23;
     }
 
     template<Register src>
     int instr_rrc() {
-        logfatal("rrc");
+        u8 val = instr_rrc(get_register<src>());
+        set_register<src>(val);
+        return 8;
     }
 
     template<AddressingMode src, Register dst>

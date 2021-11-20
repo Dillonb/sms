@@ -1057,7 +1057,12 @@ namespace Z80 {
         bool new_carry = (z80.a >> 7) & 1;
         z80.a <<= 1;
         z80.a |= (z80.f.c ? 1 : 0);
+
+        z80.f.n = false;
+        z80.f.h = false;
         z80.f.c = new_carry;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
         return 4;
     }
 
@@ -1348,7 +1353,12 @@ namespace Z80 {
         bool new_carry = z80.a & 1;
         z80.a >>= 1;
         z80.a |= (z80.f.c ? 1 : 0) << 7;
+
         z80.f.c = new_carry;
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
         return 4;
     }
 
@@ -1398,6 +1408,56 @@ namespace Z80 {
         z80.f.b3 = (z80.a >> 3) & 1;
         z80.f.b5 = (z80.a >> 5) & 1;
         return 4;
+    }
+
+    int instr_rrd() {
+        u8 old_a = z80.a;
+        u8 old_hl = z80.read_byte(z80.hl.raw);
+
+        u8 a_upper = old_a & 0xF0;
+        u8 a_lower = old_a & 0x0F;
+
+        u8 hl_upper = old_hl & 0xF0;
+        u8 hl_lower = old_hl & 0x0F;
+
+        z80.a = a_upper | hl_lower;
+        u8 new_hl = (hl_upper >> 4) | (a_lower << 4);
+        z80.write_byte(z80.hl.raw, new_hl);
+
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
+        z80.f.z = z80.a == 0;
+        z80.f.s = ((s8)z80.a) < 0;
+        z80.f.p_v = parity(z80.a);
+
+        return 18;
+    }
+
+    int instr_rld() {
+        u8 old_a = z80.a;
+        u8 old_hl = z80.read_byte(z80.hl.raw);
+
+        u8 a_upper = old_a & 0xF0;
+        u8 a_lower = old_a & 0x0F;
+
+        u8 hl_upper = old_hl & 0xF0;
+        u8 hl_lower = old_hl & 0x0F;
+
+        z80.a = a_upper | (hl_upper >> 4);
+        u8 new_hl = (hl_lower << 4) | a_lower;
+        z80.write_byte(z80.hl.raw, new_hl);
+
+        z80.f.n = false;
+        z80.f.h = false;
+        z80.f.b3 = (z80.a >> 3) & 1;
+        z80.f.b5 = (z80.a >> 5) & 1;
+        z80.f.z = z80.a == 0;
+        z80.f.s = ((s8)z80.a) < 0;
+        z80.f.p_v = parity(z80.a);
+
+        return 18;
     }
 
     const instruction instructions[0x100] = {
@@ -2540,7 +2600,7 @@ namespace Z80 {
             /* ED 64 */ unimplemented_ed_instr<0x64>,
             /* ED 65 */ unimplemented_ed_instr<0x65>,
             /* ED 66 */ unimplemented_ed_instr<0x66>,
-            /* ED 67 */ unimplemented_ed_instr<0x67>,
+            /* ED 67 */ instr_rrd,
             /* ED 68 */ unimplemented_ed_instr<0x68>,
             /* ED 69 */ unimplemented_ed_instr<0x69>,
             /* ED 6A */ instr_adc<Register::HL, Register::HL>,
@@ -2548,7 +2608,7 @@ namespace Z80 {
             /* ED 6C */ unimplemented_ed_instr<0x6C>,
             /* ED 6D */ unimplemented_ed_instr<0x6D>,
             /* ED 6E */ unimplemented_ed_instr<0x6E>,
-            /* ED 6F */ unimplemented_ed_instr<0x6F>,
+            /* ED 6F */ instr_rld,
             /* ED 70 */ unimplemented_ed_instr<0x70>,
             /* ED 71 */ unimplemented_ed_instr<0x71>,
             /* ED 72 */ instr_sbc<Register::HL, Register::SP>,

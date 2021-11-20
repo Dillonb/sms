@@ -1162,15 +1162,15 @@ namespace Z80 {
 
     u8 instr_rrc(u8 val) {
         z80.f.c = val & 1;
-        val = (val >> 1) | ((u8)z80.f.c << 7);
-        z80.f.s = val >> 7;
-        z80.f.z = val == 0;
+        u8 res = std::rotr(val, 1);
+        z80.f.s = res >> 7;
+        z80.f.z = res == 0;
         z80.f.n = false;
         z80.f.h = false;
-        z80.f.p_v = parity(val);
-        z80.f.b3 = (val >> 3) & 1;
-        z80.f.b5 = (val >> 5) & 1;
-        return val;
+        z80.f.p_v = parity(res);
+        z80.f.b3 = (res >> 3) & 1;
+        z80.f.b5 = (res >> 5) & 1;
+        return res;
     }
 
     template<AddressingMode src, Register dst>
@@ -1237,17 +1237,17 @@ namespace Z80 {
     }
 
     inline u8 instr_rr(u8 val) {
-        const bool old_c = z80.f.c;
+        const u8 old_c = z80.f.c ? 0x80 : 0x00;
         z80.f.c = val & 1;
-        val = (val >> 1) | ((u8)old_c << 7);
-        z80.f.s = ((s8)val) < 0;
-        z80.f.z = val == 0;
+        u8 res = (val >> 1) | old_c;
+        z80.f.s = ((s8)res) < 0;
+        z80.f.z = res == 0;
         z80.f.n = false;
         z80.f.h = false;
-        z80.f.p_v = parity(val);
-        z80.f.b3 = (val >> 3) & 1;
-        z80.f.b5 = (val >> 5) & 1;
-        return val;
+        z80.f.p_v = parity(res);
+        z80.f.b3 = (res >> 3) & 1;
+        z80.f.b5 = (res >> 5) & 1;
+        return res;
     }
 
     template<AddressingMode src, Register dst>
@@ -1349,8 +1349,8 @@ namespace Z80 {
     }
 
     inline uint8_t instr_sll(u8 val) {
-        z80.f.c = val >> 7;
-        val <<= 1;
+        z80.f.c = ((s8)val) < 0;
+        val = (val << 1) | 1;
         z80.f.s = ((s8)val) < 0;
         z80.f.z = val == 0;
         z80.f.n = false;
@@ -1373,8 +1373,9 @@ namespace Z80 {
     template<AddressingMode src>
     int instr_sll() {
         u16 address = get_address<src>();
-        u8 val = instr_sll(z80.read_byte(address));
-        z80.write_byte(address, val);
+        u8 val = z80.read_byte(address);
+        u8 res = instr_sll(val);
+        z80.write_byte(address, res);
         return 15;
     }
 
@@ -1417,7 +1418,7 @@ namespace Z80 {
 
     template<Register src>
     int instr_srl() {
-        u8 val = instr_sll(get_register<src>());
+        u8 val = instr_srl(get_register<src>());
         set_register<src>(val);
         return 8;
     }
@@ -1453,7 +1454,11 @@ namespace Z80 {
 
     template<int n, AddressingMode src>
     int instr_res() {
-        logfatal("instr_res");
+        u16 address = get_address<src>();
+        u8 val = z80.read_byte(address);
+        val &= ~(1 << n);
+        z80.write_byte(address, val);
+        return 15;
     }
 
     template<u8 n, Register src>
@@ -1466,22 +1471,39 @@ namespace Z80 {
 
     template<int n, AddressingMode src, Register reg>
     int instr_res() {
-        logfatal("instr_res");
+        u16 address = get_address<src>();
+        u8 val = z80.read_byte(address);
+        val &= ~(1 << n);
+        z80.write_byte(address, val);
+        set_register<reg>(val);
+        return 23;
     }
 
     template<int n, AddressingMode src>
     int instr_set() {
-        logfatal("instr_set");
+        u16 address = get_address<src>();
+        u8 val = z80.read_byte(address);
+        val |= (1 << n);
+        z80.write_byte(address, val);
+        return 15;
     }
 
     template<int n, Register src>
     int instr_set() {
-        logfatal("instr_set");
+        u8 val = get_register<src>();
+        val |= (1 << n);
+        set_register<src>(val);
+        return 8;
     }
 
     template<int n, AddressingMode src, Register reg>
     int instr_set() {
-        logfatal("instr_set");
+        u16 address = get_address<src>();
+        u8 val = z80.read_byte(address);
+        val |= (1 << n);
+        z80.write_byte(address, val);
+        set_register<reg>(val);
+        return 23;
     }
 
     int instr_im_1() {
@@ -1907,7 +1929,7 @@ namespace Z80 {
             /* CB 1C */ instr_rr<Register::H>,
             /* CB 1D */ instr_rr<Register::L>,
             /* CB 1E */ instr_rr<AddressingMode::HL>,
-            /* CB 1F */ instr_rr<AddressingMode::IXPlusPrevious, Register::A>,
+            /* CB 1F */ instr_rr<Register::A>,
             /* CB 20 */ instr_sla<Register::B>,
             /* CB 21 */ instr_sla<Register::C>,
             /* CB 22 */ instr_sla<Register::D>,

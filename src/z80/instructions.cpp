@@ -301,24 +301,28 @@ namespace {
 namespace Z80 {
     template <u8 opc>
     int unimplemented_instr() {
+        printf("Executed %ld instructions.\n", z80.instructions);
         printf("Unimplemented instruction %02X!\n", opc);
         exit(1);
     }
 
     template <u8 opc>
     int unimplemented_ed_instr() {
+        printf("Executed %ld instructions.\n", z80.instructions);
         printf("Unimplemented ED instruction %02X!\n", opc);
         exit(1);
     }
 
     template <u8 opc>
     int unimplemented_dd_instr() {
+        printf("Executed %ld instructions.\n", z80.instructions);
         printf("Unimplemented DD instruction %02X!\n", opc);
         exit(1);
     }
 
     template <u8 opc>
     int unimplemented_fd_instr() {
+        printf("Executed %ld instructions.\n", z80.instructions);
         printf("Unimplemented FD instruction %02X!\n", opc);
         exit(1);
     }

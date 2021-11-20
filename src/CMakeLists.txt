@@ -9,6 +9,12 @@ add_executable(sms main.cpp util/bitfield.h
         vdp/vdp.cpp vdp/vdp.h
         vdp/vdp_register.cpp
         vdp/vdp_register.h
-        vdp/sdl_render.cpp vdp/sdl_render.h)
+        vdp/sdl_render.cpp vdp/sdl_render.h
+
+
+        ../test/superzazu_z80/z80.c
+        ../test/superzazu_z80/z80.h
+        )
+
 target_link_libraries(sms SDL2)
 target_link_libraries(sms z80 util)

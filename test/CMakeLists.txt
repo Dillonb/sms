@@ -1,4 +1,4 @@
-add_executable(cpm_test cpm_test.cpp)
+add_executable(cpm_test cpm_test.cpp superzazu_z80/z80.c)
 target_link_libraries(cpm_test z80 util)
 
 foreach (test zexall zexdoc prelim)

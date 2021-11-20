@@ -32,11 +32,25 @@ namespace Z80 {
         z80.pc = address;
     }
 
+    void service_interrupt() {
+        z80.interrupts_enabled = false;
+        z80.next_interrupts_enabled = false;
+        z80.interrupt_pending = false;
+        switch (z80.interrupt_mode) {
+            case 1:
+                stack_push<u16>(z80.pc);
+                z80.pc = 0x0038;
+                break;
+            default:
+                logfatal("Interrupt raised. Mode: %d", z80.interrupt_mode);
+        }
+    }
+
     int step() {
+        z80.interrupts_enabled = z80.next_interrupts_enabled;
+
         u16 address = z80.pc;
         u8 opcode = z80.read_byte(z80.pc++);
-
-        z80.interrupts_enabled = z80.next_interrupts_enabled;
 
         logdebug("[%04X] %02X %02X %02X %02X", address, opcode, z80.read_byte(z80.pc), z80.read_byte(z80.pc + 1), z80.read_byte(z80.pc + 2));
         logtrace("AF: %02X%02X BC: %04X DE: %04X HL: %04X", z80.a, z80.f.assemble(), z80.bc.raw, z80.de.raw, z80.hl.raw);
@@ -49,21 +63,15 @@ namespace Z80 {
         z80.r = r_hi | ((z80.r + 1) & 0x7F);
 
         int cycles = instructions[opcode]();
+
+        if (z80.interrupts_enabled && z80.interrupt_pending) {
+            service_interrupt();
+        }
+
         return cycles;
     }
 
     void raise_interrupt() {
-        if (z80.interrupts_enabled) {
-            z80.interrupts_enabled = false;
-            z80.next_interrupts_enabled = false;
-            switch (z80.interrupt_mode) {
-                case 1:
-                    stack_push<u16>(z80.pc);
-                    z80.pc = 0x0038;
-                    break;
-                default:
-                    logfatal("Interrupt raised. Mode: %d", z80.interrupt_mode);
-            }
-        }
+        z80.interrupt_pending = true;
     }
 }

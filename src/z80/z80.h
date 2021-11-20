@@ -22,6 +22,7 @@ namespace Z80 {
 
         int interrupt_mode;
 
+        bool interrupt_pending;
         bool interrupts_enabled;
         bool next_interrupts_enabled;
 
